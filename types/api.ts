@@ -6,30 +6,34 @@
  * PPB-generated OpenAPI manifest once that lands (contracts/README preamble).
  */
 
-/** Canonical error codes enumerated in Contract-Freeze v0 §2. */
+/**
+ * Canonical error codes — Contract-Freeze v0 §2 + Main decision P4:
+ * codes are UPPER_SNAKE_CASE (e.g. `PHIRA_REAUTH_REQUIRED`). The Panel maps
+ * by exact code and preserves any future server code verbatim.
+ */
 export const API_ERROR_CODES = [
-  'request_id',
-  'pagination',
-  'validation',
-  'rate_limit',
-  'auth',
-  'session',
-  'permission_denied',
-  'pmp_unavailable',
-  'capability_not_supported',
-  'phira_api_unavailable',
-  'phira_reauth_required',
-  'long_job_accepted',
+  'REQUEST_ID',
+  'PAGINATION',
+  'VALIDATION',
+  'RATE_LIMIT',
+  'AUTH',
+  'SESSION',
+  'PERMISSION_DENIED',
+  'PMP_UNAVAILABLE',
+  'CAPABILITY_NOT_SUPPORTED',
+  'PHIRA_API_UNAVAILABLE',
+  'PHIRA_REAUTH_REQUIRED',
+  'LONG_JOB_ACCEPTED',
 ] as const
 
 /** Canonical server error code, or any future code (kept as string). */
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number] | (string & {})
 
-/** Client-local error categories (NOT part of the frozen contract). */
+/** Client-local error categories (Main decision P5, NOT server codes). */
 export const CLIENT_ERROR_CODES = [
-  'network_error',
-  'unknown_error',
-  'invalid_response',
+  'NETWORK_ERROR',
+  'UNKNOWN_ERROR',
+  'INVALID_RESPONSE',
 ] as const
 
 export type ClientErrorCode = (typeof CLIENT_ERROR_CODES)[number]

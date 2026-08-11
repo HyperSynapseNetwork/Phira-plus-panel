@@ -38,15 +38,15 @@ interface RawFetchError {
 
 function asClientErrorCode(status?: number): ClientErrorCode {
   if (status == null || status >= 500)
-    return 'unknown_error'
-  return 'network_error'
+    return 'UNKNOWN_ERROR'
+  return 'NETWORK_ERROR'
 }
 
 /**
  * Normalize any thrown fetch error into an ApiError.
  * - Server envelopes `{error:{code,message,...}}` → code/message/request_id.
  * - Empty envelopes with an HTTP status → generic code + status.
- * - Network-level failures → network_error.
+ * - Network-level failures → NETWORK_ERROR.
  */
 export function normalizeFetchError(err: unknown): ApiError {
   const raw = (err ?? {}) as RawFetchError
@@ -68,5 +68,5 @@ export function normalizeFetchError(err: unknown): ApiError {
     })
   }
 
-  return new ApiError('network_error', raw.message || '无法连接 API 服务', { status })
+  return new ApiError('NETWORK_ERROR', raw.message || '无法连接 API 服务', { status })
 }

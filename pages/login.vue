@@ -22,18 +22,18 @@ const busy = ref(false)
 function errorText(err: unknown): string {
   if (err instanceof ApiError) {
     switch (err.code) {
-      case 'auth':
-      case 'session':
+      case 'AUTH':
+      case 'SESSION':
         return '凭据无效或会话已过期'
-      case 'rate_limit':
+      case 'RATE_LIMIT':
         return '请求过于频繁，请稍后再试'
-      case 'validation':
+      case 'VALIDATION':
         return '输入不合法'
-      case 'permission_denied':
+      case 'PERMISSION_DENIED':
         return '该账户无管理权限'
-      case 'pmp_unavailable':
+      case 'PMP_UNAVAILABLE':
         return 'PMP 不可用，请稍后再试'
-      case 'network_error':
+      case 'NETWORK_ERROR':
         return '无法连接 API，请检查网络'
       default:
         return err.message || '登录失败'

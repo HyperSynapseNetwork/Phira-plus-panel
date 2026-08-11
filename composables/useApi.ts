@@ -11,8 +11,11 @@ export type { FetchOptions }
 /** JSON-only fetch options — the PPB REST namespace is JSON. */
 type JsonFetchOptions = FetchOptions<'json'>
 
-/** JSON body accepted by the typed client. */
-export type ApiBody = Record<string, unknown> | RequestInit['body'] | null
+/** JSON body accepted by the typed client (any object / BodyInit / null). */
+export type ApiBody = object | BodyInit | null
+
+/** JSON-ish query/body data accepted by the typed client. */
+type JsonData = Record<string, unknown>
 
 /**
  * Low-level typed fetch against the PPB REST namespace.
@@ -35,7 +38,7 @@ export interface ApiClient {
   /** Absolute base URL, e.g. `https://api-phira.htadiy.com/api/v1`. */
   baseURL: string
   fetch: typeof apiFetch
-  get: <T>(path: string, params?: Record<string, unknown>) => Promise<T>
+  get: <T>(path: string, params?: object) => Promise<T>
   post: <T>(path: string, body?: ApiBody) => Promise<T>
   put: <T>(path: string, body?: ApiBody) => Promise<T>
   patch: <T>(path: string, body?: ApiBody) => Promise<T>
@@ -49,10 +52,10 @@ export function useApi(): ApiClient {
   return {
     baseURL,
     fetch: apiFetch,
-    get: (path, params) => apiFetch(path, { method: 'GET', query: params }),
-    post: (path, body) => apiFetch(path, { method: 'POST', body }),
-    put: (path, body) => apiFetch(path, { method: 'PUT', body }),
-    patch: (path, body) => apiFetch(path, { method: 'PATCH', body }),
+    get: (path, params) => apiFetch(path, { method: 'GET', query: params as JsonData | undefined }),
+    post: (path, body) => apiFetch(path, { method: 'POST', body: body as RequestInit['body'] | JsonData | undefined }),
+    put: (path, body) => apiFetch(path, { method: 'PUT', body: body as RequestInit['body'] | JsonData | undefined }),
+    patch: (path, body) => apiFetch(path, { method: 'PATCH', body: body as RequestInit['body'] | JsonData | undefined }),
     delete: path => apiFetch(path, { method: 'DELETE' }),
   }
 }
