@@ -35,6 +35,10 @@ export interface PanelPreferencesData {
   sidebar: {
     collapsed: boolean
   }
+  /** Experimental Desktop Window (§22.5) — default off; account pref. */
+  desktop_window: {
+    enabled: boolean
+  }
 }
 
 export const DEFAULT_PANEL_PREFS: PanelPreferencesData = {
@@ -52,6 +56,9 @@ export const DEFAULT_PANEL_PREFS: PanelPreferencesData = {
   },
   sidebar: {
     collapsed: false,
+  },
+  desktop_window: {
+    enabled: false,
   },
 }
 

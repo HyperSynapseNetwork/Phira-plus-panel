@@ -147,6 +147,25 @@ async function save() {
           />
         </div>
       </UCard>
+
+      <UCard title="实验性功能（§22.5）">
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-foreground">
+                Desktop Window
+              </p>
+              <p class="text-xs text-muted">
+                默认关闭。启用后顶栏出现「窗口」，支持拖拽 / 缩放 / 多窗口并列；x/y/w/h 仅存本机（device pref）。
+              </p>
+            </div>
+            <USwitch v-model="prefs.data.desktop_window.enabled" />
+          </div>
+          <p class="text-xs text-muted">
+            Android 不提供或自动降级隐藏。
+          </p>
+        </div>
+      </UCard>
     </div>
 
     <p class="text-xs text-muted">
