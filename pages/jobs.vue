@@ -1,0 +1,80 @@
+<script setup lang="ts">
+import { fetchJobs } from '~/api/admin'
+import AsyncState from '~/components/admin/AsyncState.vue'
+import PageHeader from '~/components/admin/PageHeader.vue'
+import UBadge from '~/components/ui/UBadge.vue'
+import UButton from '~/components/ui/UButton.vue'
+import { useAsync } from '~/composables/useAsync'
+import { formatDateTime } from '~/utils/format'
+
+definePageMeta({ permissions: ['jobs:view'] })
+
+const jobs = useAsync(() => fetchJobs({ pageNum: 100 }))
+
+const stateTone = (s: string) => (s === 'succeeded' ? 'success' : s === 'failed' ? 'danger' : s === 'cancelled' ? 'neutral' : 'warning')
+</script>
+
+<template>
+  <div>
+    <PageHeader title="任务" subtitle="queued → running(stage/progress) → succeeded / failed / cancelled（§9.4）">
+      <template #actions>
+        <UButton size="sm" variant="outline" @click="jobs.run()">
+          刷新
+        </UButton>
+      </template>
+    </PageHeader>
+
+    <AsyncState :loading="jobs.loading.value" :error="jobs.error.value" :empty="(jobs.data.value?.items ?? []).length === 0">
+      <div class="overflow-x-auto rounded-lg border border-border bg-surface">
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-border text-xs uppercase text-muted">
+              <th class="px-3 py-2 font-medium">
+                类型
+              </th>
+              <th class="px-3 py-2 font-medium">
+                状态
+              </th>
+              <th class="px-3 py-2 font-medium">
+                阶段
+              </th>
+              <th class="px-3 py-2 font-medium">
+                进度
+              </th>
+              <th class="px-3 py-2 font-medium">
+                创建
+              </th>
+              <th class="px-3 py-2 font-medium">
+                完成
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="j in jobs.data.value?.items ?? []" :key="j.id" class="border-b border-border last:border-0">
+              <td class="px-3 py-2 font-medium text-foreground">
+                {{ j.type }}
+              </td>
+              <td class="px-3 py-2">
+                <UBadge :tone="stateTone(j.state)">
+                  {{ j.state }}
+                </UBadge>
+              </td>
+              <td class="px-3 py-2 text-muted">
+                {{ j.stage ?? '—' }}
+              </td>
+              <td class="px-3 py-2 text-muted">
+                {{ j.progress != null ? `${Math.round(j.progress * 100)}%` : '—' }}
+              </td>
+              <td class="px-3 py-2 text-muted">
+                {{ formatDateTime(j.created_at) }}
+              </td>
+              <td class="px-3 py-2 text-muted">
+                {{ formatDateTime(j.finished_at) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </AsyncState>
+  </div>
+</template>
