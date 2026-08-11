@@ -1,22 +1,19 @@
 /**
- * Permission-driven navigation stub (§18 / §8.2).
+ * Permission-driven navigation (§18 / §8.2).
  *
- * Each item declares the minimum permission ids it needs. The sidebar filters
- * against the auth store's `hasPermission`. Phase A: only the dashboard is a
- * real route; the rest are disabled placeholders (Phase C) so no speculative
- * routes are created.
- *
- * IMPORTANT: only a handful of permission ids used by the nav live here — the
- * FULL permission manifest comes from PPB (`GET /api/v1/admin/permissions`)
- * and must never be hardcoded in the UI (design §5 / §8.2).
+ * Each item declares the minimum permission ids it needs; the sidebar filters
+ * against the auth store's `hasPermission`. The ids here are a small set of
+ * stubs consistent with the integration-required set (contract §5, P7) plus a
+ * few proposed ids (`logs:view`, `jobs:view`, `automation:view`) pending the
+ * full PPB Permission Manifest — the manifest is always the authority and the
+ * full set is never hardcoded.
  */
 export interface AdminNavItem {
   label: string
   to: string
   /** Required permission ids; empty = any authenticated principal. */
   permissions: string[]
-  disabled?: boolean
-  badge?: string
+  exact?: boolean
 }
 
 export interface AdminNavSection {
@@ -28,27 +25,36 @@ export const ADMIN_NAVIGATION: AdminNavSection[] = [
   {
     title: '概览',
     items: [
-      { label: '仪表盘', to: '/', permissions: [] },
+      { label: '仪表盘', to: '/', permissions: ['dashboard:view'], exact: true },
     ],
   },
   {
     title: '管理',
     items: [
-      { label: '用户', to: '/users', permissions: ['user:view'], disabled: true, badge: 'Phase C' },
-      { label: '用户组', to: '/groups', permissions: ['group:view'], disabled: true, badge: 'Phase C' },
-      { label: '房间', to: '/rooms', permissions: ['room:view'], disabled: true, badge: 'Phase C' },
-      { label: '服务器', to: '/server', permissions: ['server:view'], disabled: true, badge: 'Phase C' },
-      { label: '配置', to: '/config', permissions: ['config:view'], disabled: true, badge: 'Phase C' },
-      { label: '插件', to: '/plugins', permissions: ['plugin:view'], disabled: true, badge: 'Phase C' },
+      { label: '用户', to: '/users', permissions: ['user:view'] },
+      { label: '用户组', to: '/groups', permissions: ['group:view'] },
+      { label: '房间', to: '/rooms', permissions: ['room:view'] },
+      { label: '服务器', to: '/server', permissions: ['server:view'] },
+      { label: '配置', to: '/config', permissions: ['config:view'] },
+      { label: '插件', to: '/plugins', permissions: ['plugin:view'] },
     ],
   },
   {
     title: '运维',
     items: [
-      { label: '日志', to: '/logs', permissions: ['logs:view'], disabled: true, badge: 'Phase C' },
-      { label: '审计', to: '/audit', permissions: ['audit:view'], disabled: true, badge: 'Phase C' },
-      { label: '控制台', to: '/console', permissions: ['pmp:cli'], disabled: true, badge: 'Phase C' },
-      { label: '通知', to: '/notifications', permissions: ['notification:send_system'], disabled: true, badge: 'Phase C' },
+      { label: '日志', to: '/logs', permissions: ['logs:view'] },
+      { label: '控制台', to: '/console', permissions: ['pmp:cli'] },
+      { label: '审计', to: '/audit', permissions: ['audit:view'] },
+      { label: '任务', to: '/jobs', permissions: ['jobs:view'] },
+      { label: '通知', to: '/notifications', permissions: ['notification:send_system'] },
+      { label: '优惠券', to: '/coupons', permissions: ['coupon:view'] },
+      { label: '自动化', to: '/automation', permissions: ['automation:view'] },
+    ],
+  },
+  {
+    title: '偏好',
+    items: [
+      { label: '面板偏好', to: '/preferences', permissions: ['preference:manage'] },
     ],
   },
 ]

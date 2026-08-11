@@ -10,6 +10,12 @@ const emit = defineEmits<{ toggle: [] }>()
 const auth = useAuthStore()
 const route = useRoute()
 
+function isActive(item: { to: string, exact?: boolean }): boolean {
+  if (item.exact)
+    return route.path === item.to
+  return route.path.startsWith(item.to)
+}
+
 const sections = computed(() =>
   ADMIN_NAVIGATION
     .map(section => ({
@@ -41,24 +47,11 @@ const sections = computed(() =>
         <ul class="space-y-1">
           <li v-for="item in section.items" :key="item.to">
             <NuxtLink
-              :to="item.disabled ? undefined : item.to"
+              :to="item.to"
               class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm"
-              :class="[
-                route.path === item.to
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-foreground hover:bg-surface-secondary',
-                item.disabled ? 'cursor-not-allowed opacity-50' : '',
-              ]"
-              :aria-disabled="item.disabled || undefined"
-              @click="item.disabled && $event.preventDefault()"
+              :class="isActive(item) ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-surface-secondary'"
             >
               <span :class="collapsed ? 'mx-auto' : ''">{{ item.label }}</span>
-              <span
-                v-if="item.badge && !collapsed"
-                class="rounded bg-warning px-1 text-[10px] leading-4 text-warning-foreground"
-              >
-                {{ item.badge }}
-              </span>
             </NuxtLink>
           </li>
         </ul>
