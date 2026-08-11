@@ -154,6 +154,49 @@ These touch the frozen PPB REST contract; **none are silently changed** here.
   (`GET /api/v1/admin/permissions`). Panel renders only what the manifest
   provides; the full set is never hardcoded.
 
+## 4b. Phase C — PROPOSED admin sub-paths (for Main to freeze)
+
+Phase C builds against the frozen admin namespace
+(`/api/v1/admin/{users,groups,permissions,rooms,server,plugins,config,logs,
+audit,jobs,commands,automation,notifications,coupons}`, contracts/README §1).
+The PPB backend may not be finished, so every page degrades gracefully when an
+endpoint is not ready. The sub-paths below are proposals — the Panel consumes
+them but Main must confirm they enter the PPB OpenAPI manifest before they are
+treated as frozen. **No fabricated contract**: every call maps to an action or
+read that design §18/§20/§10 names.
+
+- **Groups** `PUT /admin/groups/{id}/members` `{user_ids:[]}`、
+  `PUT /admin/groups/{id}/permissions` `{permissions:[]}`（§18.5 成员分配 / 权限）。
+- **Users** `GET /admin/users/{id}/multiplayer|sessions|security|audit`、
+  `POST /admin/users/{id}/actions` `{action,args}`（§18.4 各 tab + 安全操作）。
+- **Rooms** `POST /admin/rooms` `{name}`（create，§18.3 Actions）、
+  `POST /admin/rooms/{uuid}/actions` `{action,args}`（lock/cycle/kick/…）、
+  `POST /admin/rooms/actions/batch` `{action,room_uuids,args,preview}`（仅安全
+  kick/force_move/ban，preview + partial failure）。
+- **Server** `POST /admin/server/actions` `{action,args}`（config_reload /
+  shutdown / set_connections / set_room_creation / update_check|apply|cancel|
+  force，§18.6）。
+- **Config** `GET /admin/config/descriptors|values|snapshots|raw`、
+  `POST /admin/config/validate|diff|save|raw`、
+  `POST /admin/config/snapshots/{id}/rollback`（§20 Form Descriptor +
+  Snapshot/Rollback；secret 只显示 configured/missing/replace，不回显）。
+- **Plugins** `POST /admin/plugins/{id}/{enable|disable|reload|remove|call}`
+  （§18.8；remove 必须危险确认）。
+- **Logs** `POST /admin/logs/translate`（§19.2，服务端翻译；本地硬编码为
+  fallback）。**Console** `POST /admin/commands/execute`、
+  `GET /admin/commands/history?scope=personal|server`（§18.10）——
+  `POST /admin/auth/reauth` `{password}` 返回 `{reauth_token}`（P11 短期
+  reauth context，走 `X-Reauth-Token` 头）。
+- **Audit** `GET /admin/audit/export?format=csv`（§18.12，合理上限）。
+- **Jobs/Admin Tasks** `GET /admin/jobs/tasks`、`POST /admin/jobs/tasks/{id}/complete`（§18.14）。
+- **Notifications** `POST /admin/notifications/send`、
+  `GET /admin/notifications/delivery`（§18.13 composer + delivery）。
+- **Coupons** `POST /admin/coupons`、`POST /admin/coupons/{id}/revoke`（§18.14；
+  兑换执行 Action，非仅 `used=true`）。
+- **Automation** `GET/POST/PATCH/DELETE /admin/automation/runbooks[/{id}]`、
+  `POST /admin/automation/runbooks/{id}/run`、
+  `GET /admin/automation/runs`（§10；每 step 重鉴权 + snapshot/audit）。
+
 ## 5. Out of scope (Phase A)
 
 Tournament/Event/HSNBot, private IM, raw replay download, Web OS, arbitrary
