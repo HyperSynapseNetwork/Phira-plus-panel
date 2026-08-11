@@ -141,18 +141,24 @@ function doShutdown() {
             <span v-if="status.data.value?.update?.progress != null" class="text-xs text-muted">
               {{ Math.round(status.data.value.update.progress * 100) }}%
             </span>
+            <span v-if="status.data.value?.update?.stage" class="text-xs text-muted">
+              {{ status.data.value.update.stage }}
+            </span>
           </div>
+          <p v-if="status.data.value?.update?.unchanged" class="mt-2 text-sm text-success">
+            当前版本未变，已是最新版本（{{ status.data.value.update.current_version ?? '—' }}）。
+          </p>
           <p v-if="status.data.value?.update?.error" class="mt-2 text-sm text-danger">
-            更新失败：{{ status.data.value.update.error }}（下载/校验失败绝不进入 apply）
+            更新失败：{{ status.data.value.update.error }}（下载/校验失败绝不进入 apply）。
           </p>
           <div class="mt-3 flex flex-wrap gap-2">
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act('update_check')">
+            <UButton size="sm" variant="outline" :disabled="busy || !['idle', 'error'].includes(updateState)" @click="act('update_check')">
               检查更新
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy || updateState !== 'idle'" @click="act('update_apply')">
-              应用更新
+            <UButton size="sm" variant="outline" :disabled="busy || !['idle', 'error'].includes(updateState)" @click="act('update_apply')">
+              {{ updateState === 'error' ? '重试应用' : '应用更新' }}
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy || updateState === 'idle'" @click="act('update_cancel')">
+            <UButton size="sm" variant="outline" :disabled="busy || updateState === 'idle' || updateState === 'error'" @click="act('update_cancel')">
               取消
             </UButton>
           </div>
