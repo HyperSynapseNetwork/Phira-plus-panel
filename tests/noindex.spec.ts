@@ -118,6 +118,16 @@ describe.skipIf(!HAS_BUILD)('noindex regression — built output', () => {
     expect(headerValue(res).toLowerCase()).toContain('noindex')
   })
 
+  it.each(['/users', '/rooms', '/server', '/logs', '/audit', '/console', '/config', '/plugins', '/groups', '/coupons', '/automation', '/jobs', '/notifications', '/preferences'])(
+    'serves X-Robots-Tag on Phase C route %s',
+    async (path) => {
+      const res = await get(path)
+      const h = headerValue(res).toLowerCase()
+      expect(h).toContain('noindex')
+      expect([200, 404]).toContain(res.status)
+    },
+  )
+
   it('serves X-Robots-Tag on a fallback/404 route', async () => {
     const res = await get('/does-not-exist-panel-404')
     expect([200, 404]).toContain(res.status)
