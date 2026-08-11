@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { Runbook } from '~/types/admin'
-import { ref } from 'vue'
-import { createRunbook, deleteRunbook, fetchRunbookRuns, fetchRunbooks, runRunbook, updateRunbook } from '~/api/admin'
+import type { Runbook, RunbookRun } from '~/types/admin'
+import { onBeforeUnmount, ref } from 'vue'
+import { cancelRunbookRun, createRunbook, deleteRunbook, fetchRunbookRun, fetchRunbookRuns, fetchRunbooks, runRunbook, updateRunbook } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
 import UBadge from '~/components/ui/UBadge.vue'
@@ -70,27 +70,6 @@ async function save() {
   }
 }
 
-async function doRun() {
-  if (!running.value)
-    return
-  busy.value = true
-  msg.value = ''
-  let args: Record<string, unknown> = {}
-  try {
-    args = JSON.parse(runArgs.value || '{}') as Record<string, unknown>
-    await runRunbook(running.value.id, args)
-    msg.value = 'Runbook 已触发（每个 step 对当前 principal 重新鉴权 + snapshot/audit）'
-    running.value = null
-    void runs.run()
-  }
-  catch (err) {
-    msg.value = err instanceof ApiError ? err.message : (err as Error).message
-  }
-  finally {
-    busy.value = false
-  }
-}
-
 const deleteTarget = ref<Runbook | null>(null)
 
 async function confirmDelete() {
@@ -107,7 +86,84 @@ async function confirmDelete() {
   }
 }
 
-const runStatusTone = (s: string) => (s === 'succeeded' ? 'success' : s === 'failed' ? 'danger' : 'warning')
+// --- Run execution tracking (§10): live current step + per-step results. ---
+const liveRun = ref<RunbookRun | null>(null)
+const expandedRunId = ref<string | null>(null)
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+function stopPoll() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+const TERMINAL_RUN = new Set(['succeeded', 'failed', 'cancelled'])
+
+function pollRun(runId: string) {
+  stopPoll()
+  liveRun.value = null
+  pollTimer = setInterval(async () => {
+    try {
+      const run = await fetchRunbookRun(runId)
+      liveRun.value = run
+      if (TERMINAL_RUN.has(run.status)) {
+        stopPoll()
+        void runs.run()
+      }
+    }
+    catch {
+      stopPoll()
+    }
+  }, 3000)
+}
+
+onBeforeUnmount(stopPoll)
+
+async function doRun() {
+  if (!running.value)
+    return
+  busy.value = true
+  msg.value = ''
+  let args: Record<string, unknown> = {}
+  try {
+    args = JSON.parse(runArgs.value || '{}') as Record<string, unknown>
+    const res = await runRunbook(running.value.id, args)
+    msg.value = 'Runbook 已触发（每个 step 对当前 principal 重新鉴权 + snapshot/audit）'
+    running.value = null
+    pollRun(res.run_id)
+    void runs.run()
+  }
+  catch (err) {
+    msg.value = err instanceof ApiError ? err.message : (err as Error).message
+  }
+  finally {
+    busy.value = false
+  }
+}
+
+async function cancelRun(id: string) {
+  busy.value = true
+  msg.value = ''
+  try {
+    await cancelRunbookRun(id)
+    msg.value = '已请求取消（仅对可取消 step 生效）'
+    void runs.run()
+  }
+  catch (err) {
+    msg.value = err instanceof ApiError ? err.message : '取消失败'
+  }
+  finally {
+    busy.value = false
+  }
+}
+
+function toggleExpand(id: string) {
+  expandedRunId.value = expandedRunId.value === id ? null : id
+}
+
+const runStatusTone = (s: string) => (s === 'succeeded' ? 'success' : s === 'failed' || s === 'cancelled' ? 'danger' : 'warning')
+const liveStep = (r: RunbookRun | null) => r?.current_step != null ? `Step ${r.current_step}/${r.step_results?.length ?? '…'}` : '—'
 </script>
 
 <template>
@@ -167,6 +223,19 @@ const runStatusTone = (s: string) => (s === 'succeeded' ? 'success' : s === 'fai
           刷新
         </UButton>
       </div>
+      <div v-if="liveRun" class="mb-2 flex items-center gap-3 rounded border border-accent bg-accent-soft px-3 py-2 text-sm" role="status">
+        <span class="font-medium text-foreground">
+          执行中：{{ liveRun.runbook_name ?? liveRun.runbook_id }}
+        </span>
+        <span class="font-mono text-xs text-accent">
+          {{ liveStep(liveRun) }}
+        </span>
+        <span v-if="liveRun.status === 'running'" class="text-xs text-muted">当前 step 执行中…</span>
+        <UButton size="sm" variant="outline" @click="cancelRun(liveRun.id)">
+          取消
+        </UButton>
+      </div>
+
       <AsyncState :loading="runs.loading.value" :error="runs.error.value" :empty="(runs.data.value?.items ?? []).length === 0">
         <table class="w-full text-left text-sm">
           <thead>
@@ -176,29 +245,84 @@ const runStatusTone = (s: string) => (s === 'succeeded' ? 'success' : s === 'fai
               </th><th class="px-2 py-1">
                 状态
               </th><th class="px-2 py-1">
+                Step
+              </th><th class="px-2 py-1">
                 开始
               </th><th class="px-2 py-1">
                 完成
+              </th><th class="px-2 py-1">
+                操作
               </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="r in runs.data.value?.items ?? []" :key="r.id" class="border-b border-border last:border-0">
-              <td class="px-2 py-1.5">
-                {{ r.runbook_name ?? r.runbook_id }}
-              </td>
-              <td class="px-2 py-1.5">
-                <UBadge :tone="runStatusTone(r.status)">
-                  {{ r.status }}
-                </UBadge>
-              </td>
-              <td class="px-2 py-1.5 text-muted">
-                {{ formatDateTime(r.started_at) }}
-              </td>
-              <td class="px-2 py-1.5 text-muted">
-                {{ formatDateTime(r.finished_at) }}
-              </td>
-            </tr>
+            <template v-for="r in runs.data.value?.items ?? []" :key="r.id">
+              <tr class="border-b border-border last:border-0">
+                <td class="px-2 py-1.5">
+                  {{ r.runbook_name ?? r.runbook_id }}
+                </td>
+                <td class="px-2 py-1.5">
+                  <UBadge :tone="runStatusTone(r.status)">
+                    {{ r.status }}
+                  </UBadge>
+                </td>
+                <td class="px-2 py-1.5 font-mono text-xs text-muted">
+                  {{ liveStep(r) }}
+                </td>
+                <td class="px-2 py-1.5 text-muted">
+                  {{ formatDateTime(r.started_at) }}
+                </td>
+                <td class="px-2 py-1.5 text-muted">
+                  {{ formatDateTime(r.finished_at) }}
+                </td>
+                <td class="px-2 py-1.5">
+                  <div class="flex gap-1">
+                    <UButton size="sm" variant="outline" @click="toggleExpand(r.id)">
+                      {{ expandedRunId === r.id ? '收起' : '详情' }}
+                    </UButton>
+                    <UButton
+                      v-if="r.status === 'queued' || r.status === 'running'"
+                      size="sm"
+                      variant="danger"
+                      :disabled="busy"
+                      @click="cancelRun(r.id)"
+                    >
+                      取消
+                    </UButton>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="expandedRunId === r.id" class="border-b border-border bg-surface-secondary">
+                <td colspan="6" class="px-3 py-2">
+                  <div class="space-y-2 text-xs">
+                    <p v-if="r.error" class="text-danger">
+                      错误：{{ r.error }}
+                    </p>
+                    <div v-if="r.step_results?.length">
+                      <p class="mb-1 font-medium text-foreground">
+                        逐 step 结果
+                      </p>
+                      <ul class="space-y-0.5">
+                        <li v-for="s in r.step_results" :key="s.step" class="flex items-center gap-2 font-mono">
+                          <span class="text-muted">#{{ s.step }}</span>
+                          <span class="text-foreground">{{ s.action }}</span>
+                          <span :class="s.ok ? 'text-success' : 'text-danger'">{{ s.ok ? 'OK' : (s.error ?? 'FAILED') }}</span>
+                        </li>
+                      </ul>
+                    </div>
+                    <p v-if="!r.step_results?.length" class="text-muted">
+                      暂无 step 结果。
+                    </p>
+                    <details v-if="r.definition_snapshot?.length">
+                      <summary class="cursor-pointer text-muted">
+                        definition_snapshot（§10.3）
+                      </summary>
+                      <pre class="mt-1 max-h-48 overflow-auto rounded bg-surface-secondary p-2 font-mono">{{ JSON.stringify(r.definition_snapshot, null, 2) }}</pre>
+                    </details>
+                  </div>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </AsyncState>
