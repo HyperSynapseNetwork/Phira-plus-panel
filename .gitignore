@@ -1,0 +1,27 @@
+# Nuxt
+.nuxt/
+.output/
+.nitro/
+.data/
+dist/
+
+# Node
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Tests
+coverage/
