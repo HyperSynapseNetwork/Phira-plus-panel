@@ -202,6 +202,10 @@ export function exportAuditCsv(params: AuditFilter = {}): Promise<string> {
 export function fetchJobs(params?: Record<string, unknown>): Promise<Paginated<Job>> {
   return useApi().get('/admin/jobs', params)
 }
+/** PROPOSED: retry a failed job (§9.4). */
+export function retryJob(id: string): Promise<{ ok: true }> {
+  return useApi().post(`/admin/jobs/${id}/retry`)
+}
 export function fetchAdminTasks(params?: Record<string, unknown>): Promise<Paginated<AdminTask>> {
   return useApi().get('/admin/jobs/tasks', params)
 }
@@ -249,4 +253,12 @@ export function runRunbook(id: string, args: Record<string, unknown> = {}): Prom
 }
 export function fetchRunbookRuns(params?: Record<string, unknown>): Promise<Paginated<RunbookRun>> {
   return useApi().get('/admin/automation/runs', params)
+}
+/** PROPOSED: single run detail (live current_step / step_results / definition_snapshot). */
+export function fetchRunbookRun(id: string): Promise<RunbookRun> {
+  return useApi().get(`/admin/automation/runs/${id}`)
+}
+/** PROPOSED: cancel a run at the current step (only for cancellable steps). */
+export function cancelRunbookRun(id: string): Promise<{ ok: true }> {
+  return useApi().post(`/admin/automation/runs/${id}/cancel`)
 }

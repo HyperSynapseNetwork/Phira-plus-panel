@@ -196,6 +196,8 @@ export interface ServerStatus {
     state: 'idle' | 'checking' | 'downloading' | 'verifying' | 'applying' | 'error' | string
     current_version?: string
     target_version?: string
+    /** PROPOSED: update check found no newer version. */
+    unchanged?: boolean
     progress?: number
     stage?: string
     error?: string
@@ -452,8 +454,12 @@ export interface RunbookRun {
   id: string
   runbook_id: string
   runbook_name?: string
-  status: 'queued' | 'running' | 'succeeded' | 'failed' | string
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | string
+  /** 1-based index of the step currently executing (while running). */
+  current_step?: number
   step_results?: Array<{ step: number, action: string, ok: boolean, error?: string }>
+  /** Definition snapshot captured at run time (§10.3), viewable in history. */
+  definition_snapshot?: RunbookStep[]
   started_at?: string
   finished_at?: string
   error?: string
