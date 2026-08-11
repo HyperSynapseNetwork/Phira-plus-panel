@@ -1,0 +1,54 @@
+<script setup lang="ts">
+import { inputVariants } from '@heroui/styles'
+import { computed } from 'vue'
+
+/**
+ * Local Vue wrapper over the HeroUI design system (design §3.4).
+ * Uses `@heroui/styles` `inputVariants()`.
+ */
+withDefaults(defineProps<{
+  modelValue?: string
+  type?: string
+  label?: string
+  name?: string
+  placeholder?: string
+  autocomplete?: string
+  disabled?: boolean
+  required?: boolean
+}>(), {
+  modelValue: '',
+  type: 'text',
+  label: '',
+  name: undefined,
+  placeholder: '',
+  autocomplete: undefined,
+  disabled: false,
+  required: false,
+})
+
+const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+
+const classes = computed(() => inputVariants({ variant: 'primary' }))
+
+function onInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  emit('update:modelValue', target.value)
+}
+</script>
+
+<template>
+  <label class="block">
+    <span v-if="label" class="mb-1 block text-sm font-medium text-foreground">{{ label }}</span>
+    <input
+      :type="type"
+      :name="name"
+      :value="modelValue"
+      :placeholder="placeholder"
+      :autocomplete="autocomplete"
+      :disabled="disabled"
+      :required="required"
+      :class="classes"
+      @input="onInput"
+    >
+  </label>
+</template>
