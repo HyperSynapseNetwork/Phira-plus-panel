@@ -162,6 +162,13 @@ export interface RoomActionResult {
   error?: { code: string, message: string }
 }
 
+/** Batch room action response — PPB returns `{items, succeeded, failed}` (§17). */
+export interface RoomBatchResult {
+  items: RoomActionResult[]
+  succeeded: number
+  failed: number
+}
+
 // ---------------------------------------------------------------------------
 // Server (design §18.6)
 // ---------------------------------------------------------------------------

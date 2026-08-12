@@ -134,10 +134,9 @@ async function runBatch(preview: boolean) {
   batchExecuting.value = true
   try {
     const res = await runRoomBatchAction(batchAction.value, selectedList.value, { reason: batchReason.value || undefined }, preview)
-    batchPreview.value = res.results
+    batchPreview.value = res.items
     if (!preview) {
-      const failed = res.results.filter(r => !r.ok)
-      batchMsg.value = failed.length ? `完成，${failed.length} 个失败（partial failure）` : '批量操作全部成功'
+      batchMsg.value = res.failed > 0 ? `完成，${res.failed} 个失败（partial failure）` : '批量操作全部成功'
       selected.value = new Set()
     }
   }

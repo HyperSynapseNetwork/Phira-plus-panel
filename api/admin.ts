@@ -26,6 +26,7 @@ import type {
   RoomActionArgs,
   RoomActionName,
   RoomActionResult,
+  RoomBatchResult,
   Runbook,
   RunbookPayload,
   RunbookRun,
@@ -46,7 +47,7 @@ import { useApi } from '~/composables/useApi'
 
 // --- Permissions -----------------------------------------------------------
 export function fetchPermissionManifest(): Promise<PermissionManifestEntry[]> {
-  return useApi().get('/admin/permissions')
+  return useApi().get('/admin/permissions/manifest')
 }
 
 // --- Groups ----------------------------------------------------------------
@@ -99,7 +100,7 @@ export function runUserAction(id: string, action: string, args: Record<string, u
 export function fetchRooms(params?: Record<string, unknown>): Promise<Paginated<AdminRoom>> {
   return useApi().get('/admin/rooms', params)
 }
-/** PROPOSED: create a room (§18.3 Actions create). PPB not ready → graceful error. */
+/** Create a room (§18.3 Actions create / §17 `POST /rooms`). */
 export function createRoom(payload: { name: string, max_users?: number }): Promise<AdminRoom> {
   return useApi().post('/admin/rooms', payload)
 }
@@ -109,19 +110,22 @@ export function fetchRoom(uuid: string): Promise<AdminRoom> {
 export function runRoomAction(uuid: string, action: RoomActionName, args: RoomActionArgs = {}): Promise<RoomActionResult> {
   return useApi().post(`/admin/rooms/${uuid}/actions`, { action, args })
 }
-/** Batch: only safe actions (kick / force_move / ban). Preview via `preview: true`. */
+/**
+ * Batch: only safe actions (kick / force_move / ban). PPB returns
+ * `{items, succeeded, failed}` (§17); request uses `room_ids` (RoomBatchBody).
+ */
 export function runRoomBatchAction(
   action: RoomBatchActionId,
-  roomUuids: string[],
+  roomIds: string[],
   args: RoomActionArgs = {},
   preview = false,
-): Promise<{ preview: boolean, results: RoomActionResult[] }> {
-  return useApi().post('/admin/rooms/actions/batch', { action, room_uuids: roomUuids, args, preview })
+): Promise<RoomBatchResult> {
+  return useApi().post('/admin/rooms/actions/batch', { action, room_ids: roomIds, args, preview })
 }
 
 // --- Server (status/actions/update, §18.6) ---------------------------------
 export function fetchServerStatus(): Promise<ServerStatus> {
-  return useApi().get('/admin/server')
+  return useApi().get('/admin/server/status')
 }
 export function runServerAction(action: ServerAction, args: Record<string, unknown> = {}): Promise<ActionExecuteResult> {
   return useApi().post('/admin/server/actions', { action, args })
@@ -184,9 +188,9 @@ export function executeCommand(command: string, reauthToken?: string): Promise<C
   })
 }
 export function fetchCommandHistory(scope: 'personal' | 'server' = 'personal', params?: Record<string, unknown>): Promise<Paginated<CommandRun>> {
-  return useApi().get('/admin/commands/history', { scope, ...params })
+  return useApi().get('/admin/commands', { scope, ...params })
 }
-/** PROPOSED: short-lived reauth context (P11) used for elevated console commands. */
+/** Short-lived reauth context (P11) used for elevated console commands (§17 `POST /auth/reauth`). */
 export function rootReauth(password: string): Promise<{ reauth_token: string }> {
   return useApi().post('/admin/auth/reauth', { password })
 }
@@ -196,14 +200,14 @@ export function fetchAudit(params: AuditFilter & { page?: number, pageNum?: numb
   return useApi().get('/admin/audit', params)
 }
 export function exportAuditCsv(params: AuditFilter = {}): Promise<string> {
-  return useApi().get('/admin/audit/export', { ...params, format: 'csv' })
+  return useApi().get('/admin/audit/export.csv', { ...params })
 }
 
 // --- Jobs / Admin tasks (§9.4 / §18.14) ------------------------------------
 export function fetchJobs(params?: Record<string, unknown>): Promise<Paginated<Job>> {
   return useApi().get('/admin/jobs', params)
 }
-/** PROPOSED: retry a failed job (§9.4). */
+/** Retry a failed job (§9.4 / §17 `POST /jobs/{job_id}/retry`). */
 export function retryJob(id: string): Promise<{ ok: true }> {
   return useApi().post(`/admin/jobs/${id}/retry`)
 }
@@ -255,11 +259,11 @@ export function runRunbook(id: string, args: Record<string, unknown> = {}): Prom
 export function fetchRunbookRuns(params?: Record<string, unknown>): Promise<Paginated<RunbookRun>> {
   return useApi().get('/admin/runbook-runs', params)
 }
-/** PROPOSED: single run detail (live current_step / step_results / definition_snapshot). */
+/** Single run detail (live current_step / step_results / definition_snapshot). */
 export function fetchRunbookRun(id: string): Promise<RunbookRun> {
   return useApi().get(`/admin/runbook-runs/${id}`)
 }
-/** PROPOSED: cancel a run at the current step (only for cancellable steps). */
+/** Cancel a run at the current step (only for cancellable steps). */
 export function cancelRunbookRun(id: string): Promise<{ ok: true }> {
   return useApi().post(`/admin/runbook-runs/${id}/cancel`)
 }
