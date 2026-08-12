@@ -47,13 +47,13 @@ function errorText(err: unknown): string {
 /**
  * Normal-admin login (contract §20: ordinary PPB User via Phira login +
  * group membership can enter Panel). Redirect to the PPB Auth Gateway (P13);
- * after return the /me session probe authenticates the session.
+ * `client_type=panel` tells the Gateway this is the Panel (not PPF) so the
+ * post-login return goes back to the Panel, and `return_to` is a relative `/`
+ * (the Gateway whitelists it — never an absolute origin).
  */
 function phiraLoginUrl(): string {
   const base = config.public.apiBase
-  const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  const returnTo = `${origin}/`
-  return `${base}/auth/phira/login?return_to=${encodeURIComponent(returnTo)}`
+  return `${base}/auth/phira/login?client_type=panel&return_to=${encodeURIComponent('/')}`
 }
 
 async function submit() {
