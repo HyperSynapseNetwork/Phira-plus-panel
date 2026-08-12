@@ -2,9 +2,27 @@
  * Frozen cross-repo contract — PPB REST error + pagination shapes.
  * Source of truth: /root/PhiraPlus-Workspace/contracts/README.md §1-2.
  *
- * These are typed views of the frozen contract; they must NOT drift from the
- * PPB-generated OpenAPI manifest once that lands (contracts/README preamble).
+ * The canonical wire types are generated from the PPB OpenAPI contract
+ * (`types/generated.ts`, regenerated via `scripts/gen-types.sh`). Hand-written
+ * types below defer to the generated types where they overlap — the generated
+ * file is the contract authority.
  */
+import type { components } from './generated'
+
+// Re-export the generated contract types so consumers use the canonical names.
+export type {
+  ErrorBody,
+  ErrorEnvelope,
+  MeResponse,
+  PaginationResponse,
+  PhiraLoginRequest,
+  ReauthRequest,
+  ReplayDetail,
+  ReplayManifest,
+  RoomActionRequest,
+  ChatSendBody,
+  SendBody,
+} from './generated'
 
 /**
  * Canonical error codes — Contract-Freeze v0 §2 + Main decision P4:
@@ -38,23 +56,17 @@ export const CLIENT_ERROR_CODES = [
 
 export type ClientErrorCode = (typeof CLIENT_ERROR_CODES)[number]
 
-/** Error envelope — §2: `{"error":{code,message,request_id,details}}`. */
-export interface ApiErrorBody {
-  error: {
-    code: string
-    message: string
-    request_id?: string
-    details?: Record<string, unknown>
-  }
-}
+/**
+ * Error envelope — §2: `{"error":{code,message,request_id,details}}`.
+ * Alias of the generated `ErrorEnvelope` (generated wins).
+ */
+export type ApiErrorBody = components['schemas']['ErrorEnvelope']
 
-/** Unified pagination response — §2: `{items:[...], total, page, pageNum}`. */
-export interface Paginated<T> {
-  items: T[]
-  total: number
-  page: number
-  pageNum: number
-}
+/**
+ * Unified pagination response — §2: `{items:[...], total, page, pageNum}`.
+ * Based on the generated `PaginationResponse`, parameterized over the item type.
+ */
+export type Paginated<T> = Omit<components['schemas']['PaginationResponse'], 'items'> & { items: T[] }
 
 /** Unified pagination request params — §2: `page, pageNum (≤100)`. */
 export interface PaginationParams {
@@ -78,9 +90,11 @@ export interface PublicMeta {
  * Session probe — contract §20: `GET /api/v1/me` is the ONLY identity
  * interface. Returns the principal (root | user), runtime-resolved
  * permissions/capabilities, session metadata, and the CSRF token (§21).
- * `/me/profile` no longer acts as a session probe.
+ *
+ * Based on the generated `MeResponse` (generated wins on overlapping fields);
+ * the `unknown` members are narrowed to the shapes the Panel actually reads.
  */
-export interface MeSession {
+export type MeSession = Omit<components['schemas']['MeResponse'], 'principal' | 'session' | 'user'> & {
   principal: 'root' | 'user' | 'guest'
   /** Present when principal === 'user' (normal admin, Phira login + group). */
   user?: {
@@ -89,15 +103,11 @@ export interface MeSession {
     username?: string
     avatar_url?: string
   }
-  permissions: string[]
-  capabilities: string[]
   session?: {
     sid: string
     client_type: string
     created_at: string
   }
-  /** CSRF token for state-changing requests (contract §20/§21). */
-  csrf_token?: string
   /** Root first-login must change password (design §6.8). */
   must_change_password?: boolean
 }

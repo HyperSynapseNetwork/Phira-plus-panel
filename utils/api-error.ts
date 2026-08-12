@@ -8,7 +8,7 @@ import type { ApiErrorBody, ClientErrorCode } from '~/types/api'
 export class ApiError extends Error {
   readonly code: string
   readonly requestId?: string
-  readonly details?: Record<string, unknown>
+  readonly details?: unknown
   readonly status?: number
 
   constructor(
@@ -16,7 +16,7 @@ export class ApiError extends Error {
     message: string,
     opts: {
       requestId?: string
-      details?: Record<string, unknown>
+      details?: unknown
       status?: number
     } = {},
   ) {

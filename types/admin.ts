@@ -8,6 +8,24 @@
 import type { Paginated } from './api'
 import type { RoomActionId, ServerActionId } from '~/config/action-ids'
 
+// Canonical wire types generated from the PPB OpenAPI contract
+// (types/generated.ts, regenerated via scripts/gen-types.sh). Hand-written
+// admin types defer to these where they overlap.
+export type {
+  ChatSendBody,
+  ErrorBody,
+  ErrorEnvelope,
+  MeResponse,
+  PaginationResponse,
+  PhiraLoginRequest,
+  ReauthRequest,
+  ReplayDetail,
+  ReplayManifest,
+  RoomActionBody2,
+  RoomActionRequest,
+  SendBody,
+} from './generated'
+
 // ---------------------------------------------------------------------------
 // Permissions (contract §5, P7)
 // ---------------------------------------------------------------------------
