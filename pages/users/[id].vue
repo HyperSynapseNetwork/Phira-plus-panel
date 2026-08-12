@@ -17,7 +17,8 @@ import { formatDateTime, formatDuration } from '~/utils/format'
 definePageMeta({ permissions: ['user:view'] })
 
 const route = useRoute()
-const id = computed(() => String(route.params.id))
+// Route id is the Phira id (contract §22: `/admin/users/{phira_id}`).
+const phiraId = computed(() => Number(route.params.id))
 
 const tab = ref('overview')
 const actionMsg = ref('')
@@ -27,12 +28,12 @@ onMounted(() => {
   void permStore.load()
 })
 
-const user = useAsync(() => fetchUser(id.value))
+const user = useAsync(() => fetchUser(phiraId.value))
 const groups = useAsync(() => fetchGroups({ pageNum: 100 }))
-const multiplayer = useAsync(() => fetchUserMultiplayer(id.value), { immediate: false })
-const sessions = useAsync(() => fetchUserSessions(id.value), { immediate: false })
-const security = useAsync(() => fetchUserSecurity(id.value), { immediate: false })
-const audit = useAsync(() => fetchUserAudit(id.value, { pageNum: 50 }), { immediate: false })
+const multiplayer = useAsync(() => fetchUserMultiplayer(phiraId.value), { immediate: false })
+const sessions = useAsync(() => fetchUserSessions(phiraId.value), { immediate: false })
+const security = useAsync(() => fetchUserSecurity(phiraId.value), { immediate: false })
+const audit = useAsync(() => fetchUserAudit(phiraId.value, { pageNum: 50 }), { immediate: false })
 
 watch(tab, (t) => {
   if (t === 'multiplayer' && !multiplayer.ready.value)
@@ -45,6 +46,8 @@ watch(tab, (t) => {
     void audit.run()
 })
 
+const account = computed(() => user.data.value?.account)
+
 const userGroups = computed(() => {
   const all = groups.data.value?.items ?? []
   const ids = user.data.value?.groups ?? []
@@ -56,7 +59,7 @@ const effectivePerms = computed<string[]>(() => {
   const memberGroups = userGroups.value
   if (memberGroups.some(g => g.system_kind === 'admin_scope'))
     return permStore.entries.filter(e => !e.root_only).map(e => e.id)
-  return [...new Set(memberGroups.flatMap(g => g.permissions ?? []))].sort()
+  return [...new Set(memberGroups.flatMap(g => g.permissions))].sort()
 })
 
 const permLabel = (id: string): string => permStore.find(id)?.label ?? id
@@ -64,7 +67,7 @@ const permLabel = (id: string): string => permStore.find(id)?.label ?? id
 async function doAction(action: string, args: Record<string, unknown> = {}) {
   actionMsg.value = ''
   try {
-    await runUserAction(id.value, action, args)
+    await runUserAction(phiraId.value, action, args)
     actionMsg.value = `操作 ${action} 已提交`
     void security.run()
     void multiplayer.run()
@@ -81,7 +84,7 @@ function auditRow(e: AuditEvent) {
 
 <template>
   <div>
-    <PageHeader :title="user.data.value?.username ?? `用户 ${id}`" subtitle="PPB + PMP 统一管理（§18.4）">
+    <PageHeader :title="account?.username ?? `用户 ${phiraId}`" subtitle="PPB + PMP 统一管理（§18.4）">
       <template #actions>
         <NuxtLink to="/users" class="text-xs text-muted hover:text-foreground">
           ← 用户列表
@@ -114,45 +117,57 @@ function auditRow(e: AuditEvent) {
               <dt class="text-xs text-muted">
                 Phira ID
               </dt><dd class="text-foreground">
-                {{ user.data.value?.phira_id }}
+                {{ account?.phira_id }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs text-muted">
+                PPB UUID
+              </dt><dd class="font-mono text-xs text-foreground">
+                {{ account?.ppb_user_id }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
                 状态
-              </dt><dd :class="user.data.value?.status === 'banned' ? 'text-danger' : 'text-foreground'">
-                {{ user.data.value?.status }}
+              </dt><dd :class="account?.status === 'banned' ? 'text-danger' : 'text-foreground'">
+                {{ account?.status }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
                 创建时间
               </dt><dd class="text-foreground">
-                {{ formatDateTime(user.data.value?.created_at) }}
+                {{ formatDateTime(account?.created_at) }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
                 最近活跃
               </dt><dd class="text-foreground">
-                {{ formatDateTime(user.data.value?.last_seen_at) }}
+                {{ formatDateTime(account?.last_seen_at ?? undefined) }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                所在房间
-              </dt><dd class="text-foreground">
-                {{ user.data.value?.current_room_uuid ?? '—' }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-xs text-muted">
-                Presence
-              </dt><dd class="text-foreground">
-                {{ user.data.value?.presence ?? '—' }}
+                Avatar
+              </dt><dd class="truncate text-foreground">
+                {{ account?.avatar || '—' }}
               </dd>
             </div>
           </dl>
+        </section>
+
+        <section class="rounded-lg border border-border bg-surface p-4">
+          <h3 class="mb-2 text-sm font-medium text-foreground">
+            PMP player
+          </h3>
+          <template v-if="user.data.value?.player">
+            <pre class="max-h-48 overflow-auto rounded bg-surface-secondary p-2 font-mono text-xs">{{ JSON.stringify(user.data.value.player, null, 2) }}</pre>
+          </template>
+          <p v-else class="text-sm text-muted">
+            PMP 未连接或该用户无在线数据（player 动态 payload）。
+          </p>
         </section>
       </AsyncState>
     </div>

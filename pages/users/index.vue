@@ -70,10 +70,10 @@ watch(page, () => {
               Phira ID
             </th>
             <th class="px-3 py-2 font-medium">
-              状态
+              PPB UUID
             </th>
             <th class="px-3 py-2 font-medium">
-              所在房间
+              状态
             </th>
             <th class="px-3 py-2 font-medium">
               最近活跃
@@ -82,23 +82,23 @@ watch(page, () => {
         </thead>
         <tbody>
           <AsyncState :loading="list.loading.value" :error="list.error.value" :empty="(list.data.value?.items ?? []).length === 0">
-            <tr v-for="u in list.data.value?.items ?? []" :key="u.id" class="border-b border-border last:border-0 hover:bg-surface-secondary">
+            <tr v-for="u in list.data.value?.items ?? []" :key="u.ppb_user_id" class="border-b border-border last:border-0 hover:bg-surface-secondary">
               <td class="px-3 py-2">
-                <NuxtLink :to="`/users/${u.id}`" class="font-medium text-accent hover:underline">
-                  {{ u.username ?? u.phira_id }}
+                <NuxtLink :to="`/users/${u.phira_id}`" class="font-medium text-accent hover:underline">
+                  {{ u.username }}
                 </NuxtLink>
               </td>
               <td class="px-3 py-2 text-muted">
                 {{ u.phira_id }}
               </td>
+              <td class="px-3 py-2 font-mono text-xs text-muted">
+                {{ u.ppb_user_id.slice(0, 8) }}
+              </td>
               <td class="px-3 py-2">
                 <span class="text-xs" :class="u.status === 'banned' ? 'text-danger' : u.status === 'active' ? 'text-success' : 'text-muted'">{{ u.status }}</span>
               </td>
               <td class="px-3 py-2 text-muted">
-                {{ u.current_room_uuid ? u.current_room_uuid.slice(0, 8) : '—' }}
-              </td>
-              <td class="px-3 py-2 text-muted">
-                {{ formatDateTime(u.last_seen_at) }}
+                {{ formatDateTime(u.last_seen_at ?? undefined) }}
               </td>
             </tr>
           </AsyncState>
