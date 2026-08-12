@@ -63,7 +63,7 @@
 ## 快速开始
 
 > [!NOTE]
-> 本地需要 Node ≥ 22 与 pnpm ≥ 11（仓库 `packageManager: pnpm@11.8.0`，registry 走 npmmirror，见 `.npmrc`）。
+> 本地需要 Node ≥ 22 与 pnpm ≥ 11（仓库 `packageManager: pnpm@11.8.0`，pnpm 设置见 `pnpm-workspace.yaml`）。
 
 ```bash
 pnpm install

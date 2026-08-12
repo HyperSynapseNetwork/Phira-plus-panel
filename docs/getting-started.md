@@ -5,7 +5,7 @@
 ## 前置条件
 
 - Node ≥ 22
-- pnpm ≥ 11（仓库 `packageManager: pnpm@11.8.0`；registry 走 npmmirror，见 `.npmrc`）
+- pnpm ≥ 11（仓库 `packageManager: pnpm@11.8.0`；pnpm 设置见 `pnpm-workspace.yaml`）
 - 可用的 PPB 实例（默认 `https://api-phira.htadiy.com`；PPB 未就绪时各页优雅降级）
 
 ## 安装与开发
