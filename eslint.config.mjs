@@ -18,6 +18,9 @@ export default antfu(
       '**/node_modules/**',
       '**/pnpm-lock.yaml',
       '**/*.d.ts',
+      // Generated from the PPB OpenAPI contract (scripts/gen-types.sh) —
+      // linted by openapi-typescript upstream, not by the panel.
+      '**/types/generated.ts',
     ],
   },
   {

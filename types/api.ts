@@ -11,6 +11,7 @@ import type { components } from './generated'
 
 // Re-export the generated contract types so consumers use the canonical names.
 export type {
+  ChatSendBody,
   ErrorBody,
   ErrorEnvelope,
   MeResponse,
@@ -20,7 +21,6 @@ export type {
   ReplayDetail,
   ReplayManifest,
   RoomActionRequest,
-  ChatSendBody,
   SendBody,
 } from './generated'
 
