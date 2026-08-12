@@ -39,19 +39,20 @@ export interface PermissionManifestEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Groups (design §18.5)
+// Groups (design §18.5) — list item shape (contract §22: GroupListItem
+// carries permissions[] + member_count).
 // ---------------------------------------------------------------------------
 export interface Group {
   id: string
   name: string
-  description?: string
-  system_kind: 'none' | 'admin_scope' | null
+  description: string
+  system_kind?: string | null
   is_default: boolean
   protected: boolean
-  member_count?: number
+  member_count: number
   permissions: string[]
-  created_at?: string
-  updated_at?: string
+  created_at: string
+  updated_at: string
 }
 
 export interface GroupPayload {
@@ -61,19 +62,28 @@ export interface GroupPayload {
 }
 
 // ---------------------------------------------------------------------------
-// Users — unified PPB + PMP admin experience (design §18.4)
+// Users — unified PPB + PMP admin experience (design §18.4 / contract §22:
+// `ppb_user_id` (UUID) vs `phira_id` (Phira i32); avatar/username).
 // ---------------------------------------------------------------------------
 export interface AdminUser {
-  id: string
+  /** PPB UUID (contract §20 ID semantics). */
+  ppb_user_id: string
+  /** Phira i32 — the route id for `/admin/users/{phira_id}`. */
   phira_id: number
-  username?: string
-  avatar_url?: string
-  status: 'active' | 'banned' | 'disabled' | string
+  username: string
+  avatar: string
+  status: string
   created_at: string
-  last_seen_at?: string
-  groups?: string[]
-  current_room_uuid?: string
-  presence?: 'online' | 'offline' | 'in_room' | string
+  last_seen_at?: string | null
+  updated_at: string
+}
+
+/** `GET /admin/users/{phira_id}` → `{account, groups, player}` (§22). */
+export interface UserDetail {
+  account: AdminUser
+  groups: string[]
+  /** Best-effort PMP player info (dynamic payload; null when PMP offline). */
+  player?: unknown
 }
 
 export interface UserMultiplayer {
@@ -217,45 +227,67 @@ export interface ServerStatus {
 export type ServerAction = ServerActionId
 
 // ---------------------------------------------------------------------------
-// Config — Form Descriptor (design §20.2)
+// Config — Form Descriptor, model A (contract §22): Panel submits Form
+// values; PPB validates / generates YAML / saves.
 // ---------------------------------------------------------------------------
-export type ConfigWidget = 'switch' | 'text' | 'number' | 'select' | 'textarea' | 'secret' | 'yaml'
-
 export interface ConfigFieldDescriptor {
   path: string
   label: string
-  description?: string
-  group: string
-  widget: ConfigWidget
-  min?: number
-  max?: number
-  unit?: string
-  enum?: Array<{ label: string, value: string }>
-  reload: 'hot' | 'restart' | 'rebuild'
-  risk: 'low' | 'medium' | 'high' | 'critical'
-  permission?: string
-  sensitive?: boolean
-  deprecated?: boolean
-  order?: number
+  description: string
+  order: number
+  permission: string
+  /** hot | restart | rebuild */
+  reload_semantics: string
+  risk: string
+  sensitive: boolean
+  /** Wire value type: string | number | boolean. */
+  type: string
+  widget: string
+  min?: number | null
+  max?: number | null
+  default?: unknown
+}
+
+export interface ConfigFieldGroup {
+  key: string
+  label: string
+  fields: ConfigFieldDescriptor[]
+}
+
+/** `GET /config/descriptors` → `{version, groups}` (§22). */
+export interface ConfigDescriptorsResponse {
+  version: number
+  groups: ConfigFieldGroup[]
 }
 
 export interface ConfigValue {
   [path: string]: unknown
 }
 
+/** `GET /config/values` → `{version, values}` (§22). */
+export interface ConfigValuesResponse {
+  version: number
+  values: ConfigValue
+}
+
+export interface ConfigValidationResult {
+  ok: boolean
+  errors: Array<{ path: string, message: string }>
+}
+
+/** `POST /config/diff` → `{changes: [{path, old, new}]}` (§22). */
 export interface ConfigDiffResult {
-  unchanged: string[]
-  added: string[]
-  removed: string[]
-  modified: Array<{ path: string, from: unknown, to: unknown }>
+  changes: Array<{ path: string, old: unknown, new: unknown }>
 }
 
 export interface ConfigSnapshot {
   id: string
-  label: string
+  note: string
+  content: string
   created_at: string
-  author?: string
-  values_count?: number
+  created_by?: string | null
+  restored_at?: string | null
+  scope: string
 }
 
 // ---------------------------------------------------------------------------
@@ -359,17 +391,34 @@ export interface Job {
   id: string
   type: string
   state: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | string
-  stage?: string
-  progress?: number
-  error?: string
+  stage: string
+  /** Contract §22: no fake percentages — null when PMP has no real progress. */
+  progress?: number | null
+  error: string
   created_at: string
-  started_at?: string
-  finished_at?: string
+  started_at?: string | null
+  finished_at?: string | null
 }
 
 // ---------------------------------------------------------------------------
-// Notifications (admin composer, design §18.13)
+// Notifications (admin composer, design §18.13 / contract §22)
 // ---------------------------------------------------------------------------
+/**
+ * Notification action dispatcher whitelist (§22): the ONLY action values a
+ * notification payload may carry. Backend executes join_room/friend_accept/
+ * friend_reject; the rest are pure deep-links the frontend navigates to.
+ * Never an arbitrary Action Registry ID.
+ */
+export type NotificationAction
+  = | 'join_room'
+    | 'friend_accept'
+    | 'friend_reject'
+    | 'open_chart'
+    | 'open_replay'
+    | 'open_room'
+    | 'open_user'
+    | 'open_profile'
+
 export interface AdminNotificationComposer {
   type: string
   priority: 'low' | 'normal' | 'high'
@@ -380,7 +429,7 @@ export interface AdminNotificationComposer {
     group_ids?: string[]
     user_ids?: string[]
   }
-  actions?: Array<{ label: string, action: string, data?: Record<string, unknown> }>
+  actions?: Array<{ label: string, action: NotificationAction, data?: Record<string, unknown> }>
   dedup_key?: string
 }
 

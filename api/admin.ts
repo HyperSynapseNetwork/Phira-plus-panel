@@ -8,10 +8,12 @@ import type {
   AuditEvent,
   AuditFilter,
   CommandRun,
+  ConfigDescriptorsResponse,
   ConfigDiffResult,
-  ConfigFieldDescriptor,
   ConfigSnapshot,
+  ConfigValidationResult,
   ConfigValue,
+  ConfigValuesResponse,
   Coupon,
   CouponPayload,
   Group,
@@ -32,6 +34,7 @@ import type {
   RunbookRun,
   ServerAction,
   ServerStatus,
+  UserDetail,
   UserMultiplayer,
   UserSecurity,
   UserSession,
@@ -77,23 +80,24 @@ export function setGroupPermissions(id: string, permissions: string[]): Promise<
 export function fetchUsers(params?: Record<string, unknown>): Promise<Paginated<AdminUser>> {
   return useApi().get('/admin/users', params)
 }
-export function fetchUser(id: string): Promise<AdminUser> {
-  return useApi().get(`/admin/users/${id}`)
+/** `GET /admin/users/{phira_id}` → `{account, groups, player}` (§22). */
+export function fetchUser(phiraId: number): Promise<UserDetail> {
+  return useApi().get(`/admin/users/${phiraId}`)
 }
-export function fetchUserMultiplayer(id: string): Promise<UserMultiplayer> {
-  return useApi().get(`/admin/users/${id}/multiplayer`)
+export function fetchUserMultiplayer(phiraId: number): Promise<UserMultiplayer> {
+  return useApi().get(`/admin/users/${phiraId}/multiplayer`)
 }
-export function fetchUserSessions(id: string): Promise<UserSession[]> {
-  return useApi().get(`/admin/users/${id}/sessions`)
+export function fetchUserSessions(phiraId: number): Promise<UserSession[]> {
+  return useApi().get(`/admin/users/${phiraId}/sessions`)
 }
-export function fetchUserSecurity(id: string): Promise<UserSecurity> {
-  return useApi().get(`/admin/users/${id}/security`)
+export function fetchUserSecurity(phiraId: number): Promise<UserSecurity> {
+  return useApi().get(`/admin/users/${phiraId}/security`)
 }
-export function fetchUserAudit(id: string, params?: Record<string, unknown>): Promise<Paginated<AuditEvent>> {
-  return useApi().get(`/admin/users/${id}/audit`, params)
+export function fetchUserAudit(phiraId: number, params?: Record<string, unknown>): Promise<Paginated<AuditEvent>> {
+  return useApi().get(`/admin/users/${phiraId}/audit`, params)
 }
-export function runUserAction(id: string, action: string, args: Record<string, unknown> = {}): Promise<ActionExecuteResult> {
-  return useApi().post(`/admin/users/${id}/actions`, { action, args })
+export function runUserAction(phiraId: number, action: string, args: Record<string, unknown> = {}): Promise<ActionExecuteResult> {
+  return useApi().post(`/admin/users/${phiraId}/actions`, { action, args })
 }
 
 // --- Rooms (list/detail/actions/batch, §18.3) ------------------------------
@@ -131,34 +135,32 @@ export function runServerAction(action: ServerAction, args: Record<string, unkno
   return useApi().post('/admin/server/actions', { action, args })
 }
 
-// --- Config (Form Descriptor + snapshot/rollback, §20) ---------------------
-export function fetchConfigDescriptors(): Promise<ConfigFieldDescriptor[]> {
+// --- Config (Form Descriptor model A + snapshot/rollback, §20/§22) ---------
+export function fetchConfigDescriptors(): Promise<ConfigDescriptorsResponse> {
   return useApi().get('/admin/config/descriptors')
 }
-export function fetchConfigValues(): Promise<ConfigValue> {
+export function fetchConfigValues(): Promise<ConfigValuesResponse> {
   return useApi().get('/admin/config/values')
 }
-export function validateConfig(values: ConfigValue): Promise<{ ok: boolean, errors: Array<{ path: string, message: string }> }> {
+export function validateConfig(values: ConfigValue): Promise<ConfigValidationResult> {
   return useApi().post('/admin/config/validate', { values })
 }
 export function diffConfig(values: ConfigValue): Promise<ConfigDiffResult> {
   return useApi().post('/admin/config/diff', { values })
 }
-export function saveConfig(values: ConfigValue): Promise<{ ok: true, snapshot_id?: string }> {
-  return useApi().post('/admin/config/save', { values, snapshot: true })
+/** Save form values (§22 model A): PPB validates / generates YAML / snapshots. */
+export function saveConfig(values: ConfigValue): Promise<{ ok: boolean, snapshot_id?: string }> {
+  return useApi().post('/admin/config/save', { values })
 }
-export function fetchConfigSnapshots(): Promise<ConfigSnapshot[]> {
+export function fetchConfigSnapshots(): Promise<{ items: ConfigSnapshot[] }> {
   return useApi().get('/admin/config/snapshots')
 }
 export function rollbackConfig(snapshotId: string): Promise<{ ok: true }> {
   return useApi().post('/admin/config/rollback', { snapshot_id: snapshotId })
 }
+/** Raw YAML view (read-only advanced entry, §20.3). */
 export function fetchConfigRaw(): Promise<string> {
   return useApi().get('/admin/config/raw')
-}
-export function saveConfigRaw(raw: string): Promise<{ ok: true }> {
-  // ConfigContentBody `{content}` (design §20.3) — validated before apply.
-  return useApi().post('/admin/config/save', { content: raw, note: 'panel raw edit' })
 }
 
 // --- Plugins (§18.8) -------------------------------------------------------
