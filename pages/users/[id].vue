@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AuditEvent } from '~/types/admin'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { fetchGroups, fetchUser, fetchUserAudit, fetchUserMultiplayer, fetchUserSecurity, fetchUserSessions, runUserAction } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
@@ -10,6 +10,7 @@ import UButton from '~/components/ui/UButton.vue'
 import UTabs from '~/components/ui/UTabs.vue'
 import { useAsync } from '~/composables/useAsync'
 import { USER_ACTION } from '~/config/action-ids'
+import { usePermissionsStore } from '~/stores/permissions'
 import { ApiError } from '~/utils/api-error'
 import { formatDateTime, formatDuration } from '~/utils/format'
 
@@ -20,6 +21,11 @@ const id = computed(() => String(route.params.id))
 
 const tab = ref('overview')
 const actionMsg = ref('')
+const permStore = usePermissionsStore()
+
+onMounted(() => {
+  void permStore.load()
+})
 
 const user = useAsync(() => fetchUser(id.value))
 const groups = useAsync(() => fetchGroups({ pageNum: 100 }))
@@ -44,6 +50,16 @@ const userGroups = computed(() => {
   const ids = user.data.value?.groups ?? []
   return all.filter(g => ids.includes(g.id))
 })
+
+/** Effective permissions = union of member-group permissions (§18.4/§18.5). */
+const effectivePerms = computed<string[]>(() => {
+  const memberGroups = userGroups.value
+  if (memberGroups.some(g => g.system_kind === 'admin_scope'))
+    return permStore.entries.filter(e => !e.root_only).map(e => e.id)
+  return [...new Set(memberGroups.flatMap(g => g.permissions ?? []))].sort()
+})
+
+const permLabel = (id: string): string => permStore.find(id)?.label ?? id
 
 async function doAction(action: string, args: Record<string, unknown> = {}) {
   actionMsg.value = ''
@@ -207,7 +223,21 @@ function auditRow(e: AuditEvent) {
             <span v-if="!userGroups.length" class="text-sm text-muted">暂无用户组</span>
           </div>
           <p class="mt-3 text-xs text-muted">
-            有效权限 = 所属组权限并集。成员分配请在「用户组」页面操作（§18.4/§18.5）。
+            有效权限 = 所属组权限并集（admin_scope 自动映射全部非 root 权限）。成员分配请在「用户组」页面操作（§18.4/§18.5）。
+          </p>
+          <div v-if="effectivePerms.length" class="mt-3">
+            <h4 class="mb-1 text-sm font-medium text-foreground">
+              有效权限预览（{{ effectivePerms.length }}）
+            </h4>
+            <ul class="grid grid-cols-1 gap-1 text-xs text-muted sm:grid-cols-2">
+              <li v-for="p in effectivePerms" :key="p" class="flex items-center gap-2">
+                <span class="font-mono text-accent">{{ p }}</span>
+                <span>{{ permLabel(p) }}</span>
+              </li>
+            </ul>
+          </div>
+          <p v-else class="mt-3 text-xs text-muted">
+            暂无有效权限（无组成员或权限为空）。
           </p>
         </section>
       </AsyncState>

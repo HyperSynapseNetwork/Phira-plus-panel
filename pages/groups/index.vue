@@ -221,7 +221,13 @@ async function confirmDelete() {
           <p class="mb-1 text-sm font-medium text-foreground">
             权限
           </p>
-          <PermissionTree v-model="selectedPerms" />
+          <p v-if="editing?.system_kind === 'admin_scope'" class="mb-1 text-xs text-warning">
+            admin_scope 自动映射全部非 root 权限，不在此逐项授予（§8.3）。
+          </p>
+          <p v-else-if="editing?.protected" class="mb-1 text-xs text-warning">
+            该组为受保护的内置组，权限可编辑但请谨慎操作。
+          </p>
+          <PermissionTree v-model="selectedPerms" :disabled="editing?.system_kind === 'admin_scope'" />
         </div>
         <div v-if="editing">
           <p class="mb-1 text-sm font-medium text-foreground">
