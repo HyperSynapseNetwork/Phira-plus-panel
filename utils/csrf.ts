@@ -35,11 +35,15 @@ export function refreshCsrfToken(baseURL: string): Promise<string | null> {
     return refreshPromise
   refreshPromise = (async () => {
     try {
-      const { $fetch } = await import('ofetch')
-      const res = await $fetch<{ csrf_token?: string }>(`${baseURL}/me`, {
-        credentials: 'include',
-      })
-      csrfToken = res.csrf_token ?? null
+      // Native fetch (no ofetch dep) — credentialed so the HttpOnly session
+      // cookie is sent; the server validates Origin itself.
+      const res = await fetch(`${baseURL}/me`, { credentials: 'include' })
+      if (!res.ok) {
+        csrfToken = null
+        return null
+      }
+      const data = await res.json() as { csrf_token?: string }
+      csrfToken = data.csrf_token ?? null
       return csrfToken
     }
     catch {
