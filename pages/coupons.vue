@@ -11,10 +11,14 @@ import UModal from '~/components/ui/UModal.vue'
 import USelect from '~/components/ui/USelect.vue'
 import UTextarea from '~/components/ui/UTextarea.vue'
 import { useAsync } from '~/composables/useAsync'
+import { useAuthStore } from '~/stores/auth'
 import { ApiError } from '~/utils/api-error'
 import { formatDateTime } from '~/utils/format'
 
 definePageMeta({ permissions: ['coupon:view'] })
+
+const auth = useAuthStore()
+const canManageTasks = computed(() => auth.hasPermission(['coupon:manage']))
 
 const coupons = useAsync(() => fetchCoupons({ pageNum: 100 }))
 const tasks = useAsync(() => fetchAdminTasks({ pageNum: 100 }))
@@ -205,7 +209,7 @@ const statusTone = (s: string) => (s === 'active' || s === 'completed' ? 'succes
                 {{ formatDateTime(t.created_at) }}
               </td>
               <td class="px-2 py-1.5">
-                <UButton v-if="t.status === 'pending'" size="sm" variant="primary" @click="doComplete(t.id)">
+                <UButton v-if="t.status === 'pending'" size="sm" variant="primary" :disabled="!canManageTasks" @click="doComplete(t.id)">
                   完成
                 </UButton>
               </td>

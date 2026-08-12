@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { fetchJobs, retryJob } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
 import UBadge from '~/components/ui/UBadge.vue'
 import UButton from '~/components/ui/UButton.vue'
 import { useAsync } from '~/composables/useAsync'
+import { useAuthStore } from '~/stores/auth'
 import { ApiError } from '~/utils/api-error'
 import { formatDateTime } from '~/utils/format'
 
-definePageMeta({ permissions: ['jobs:view'] })
+definePageMeta({ permissions: ['server:view'] })
+
+const auth = useAuthStore()
+const canRetry = computed(() => auth.hasPermission(['server:update']))
 
 const jobs = useAsync(() => fetchJobs({ pageNum: 100 }))
 const busy = ref(false)
@@ -103,7 +107,7 @@ const stateTone = (s: string) => (s === 'succeeded' ? 'success' : s === 'failed'
                   v-if="j.state === 'failed'"
                   size="sm"
                   variant="outline"
-                  :disabled="busy"
+                  :disabled="busy || !canRetry"
                   @click="doRetry(j.id)"
                 >
                   重试

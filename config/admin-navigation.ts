@@ -2,11 +2,11 @@
  * Permission-driven navigation (§18 / §8.2).
  *
  * Each item declares the minimum permission ids it needs; the sidebar filters
- * against the auth store's `hasPermission`. The ids here are a small set of
- * stubs consistent with the integration-required set (contract §5, P7) plus a
- * few proposed ids (`logs:view`, `jobs:view`, `automation:view`) pending the
- * full PPB Permission Manifest — the manifest is always the authority and the
- * full set is never hardcoded.
+ * against the auth store's `hasPermission`. The ids here are a small set
+ * consistent with the integration-required set (contract §5, P7) and the
+ * documented admin pages (`logs:view`, `automation:view`, `server:view`,
+ * `coupon:view`, …) — the PPB Permission Manifest is always the authority and
+ * the full set is never hardcoded.
  */
 export interface AdminNavItem {
   label: string
@@ -45,7 +45,7 @@ export const ADMIN_NAVIGATION: AdminNavSection[] = [
       { label: '日志', to: '/logs', permissions: ['logs:view'] },
       { label: '控制台', to: '/console', permissions: ['pmp:cli'] },
       { label: '审计', to: '/audit', permissions: ['audit:view'] },
-      { label: '任务', to: '/jobs', permissions: ['jobs:view'] },
+      { label: '任务', to: '/jobs', permissions: ['server:view'] },
       { label: '通知', to: '/notifications', permissions: ['notification:send_system'] },
       { label: '优惠券', to: '/coupons', permissions: ['coupon:view'] },
       { label: '自动化', to: '/automation', permissions: ['automation:view'] },
