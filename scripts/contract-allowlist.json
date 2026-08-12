@@ -1,0 +1,11 @@
+{
+  "_comment": "Endpoints the Panel calls that are contract-frozen but not yet present in the PPB OpenAPI. Every entry here is a known gap to be removed once PPB registers the path in contracts/openapi.json.",
+  "allowed": [
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/auth/reauth",
+      "reason": "§17 frozen (P11 reauth context via X-Reauth-Token); pending PPB OpenAPI registration"
+    }
+  ],
+  "ws": []
+}

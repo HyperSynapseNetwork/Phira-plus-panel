@@ -1,7 +1,8 @@
 name: Panel Build
 
-# Panel CI (design §26.4): reproducible install → lint → vue-tsc → tests →
-# Nuxt SPA build → noindex regression check. No sitemap is ever generated.
+# Panel CI (design §26.4): reproducible install → lint → contract-consistency →
+# vue-tsc → tests → Nuxt SPA build → noindex regression check.
+# No sitemap is ever generated.
 on:
   push:
     branches: [main]
@@ -13,7 +14,7 @@ permissions:
 
 jobs:
   build:
-    name: Lint · typecheck · test · build · noindex
+    name: Lint · contract · typecheck · test · build · noindex
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -35,6 +36,13 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      # Contract consistency (DESIGN/CONTRACT_CONSISTENCY_TEST.md): every
+      # /api/v1… and /ws/v1… call in panel source must resolve in the PPB
+      # OpenAPI (method + path, {param} wildcard). Fails on any unregistered
+      # call so contract drift is caught at CI time.
+      - name: Contract consistency
+        run: node scripts/check-contract-consistency.mjs
 
       - name: Typecheck (vue-tsc)
         run: pnpm vue-tsc
