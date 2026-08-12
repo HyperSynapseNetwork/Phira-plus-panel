@@ -26,13 +26,17 @@ withDefaults(defineProps<{
   required: false,
 })
 
-const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+const emit = defineEmits<{ 'update:modelValue': [value: string], 'blur': [FocusEvent] }>()
 
 const classes = computed(() => inputVariants({ variant: 'primary' }))
 
 function onInput(event: Event) {
   const target = event.target as HTMLInputElement
   emit('update:modelValue', target.value)
+}
+
+function onBlur(event: FocusEvent) {
+  emit('blur', event)
 }
 </script>
 
@@ -49,6 +53,7 @@ function onInput(event: Event) {
       :required="required"
       :class="classes"
       @input="onInput"
+      @blur="onBlur"
     >
   </label>
 </template>

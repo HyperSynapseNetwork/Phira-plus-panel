@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   open?: boolean
   title?: string
   width?: string
@@ -13,6 +13,10 @@ withDefaults(defineProps<{
 
 const emit = defineEmits<{ close: [] }>()
 
+const titleId = `umodal-title-${Math.random().toString(36).slice(2, 8)}`
+const panelEl = ref<HTMLElement | null>(null)
+let lastFocused: HTMLElement | null = null
+
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape')
     emit('close')
@@ -20,6 +24,18 @@ function onKeydown(e: KeyboardEvent) {
 
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+
+watch(() => props.open, (open) => {
+  if (open) {
+    lastFocused = document.activeElement as HTMLElement | null
+    // Move focus into the dialog after mount for screen-reader + keyboard users.
+    requestAnimationFrame(() => panelEl.value?.focus())
+  }
+  else if (lastFocused) {
+    lastFocused.focus?.()
+    lastFocused = null
+  }
+})
 </script>
 
 <template>
@@ -29,22 +45,25 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       class="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
+      :aria-labelledby="title ? titleId : undefined"
     >
       <div class="absolute inset-0 bg-backdrop" @click="emit('close')" />
       <div
-        class="relative flex max-h-[85vh] w-full flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-overlay"
+        ref="panelEl"
+        tabindex="-1"
+        class="relative flex max-h-[85vh] w-full flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-overlay focus:outline-none"
         :class="width"
       >
         <header
           v-if="title"
           class="flex h-12 shrink-0 items-center justify-between border-b border-border px-4"
         >
-          <h3 class="text-sm font-semibold text-foreground">
+          <h3 :id="titleId" class="text-sm font-semibold text-foreground">
             {{ title }}
           </h3>
           <button
             type="button"
-            class="text-muted transition-colors hover:text-foreground"
+            class="rounded p-1 text-muted transition-colors hover:text-foreground"
             aria-label="关闭"
             @click="emit('close')"
           >

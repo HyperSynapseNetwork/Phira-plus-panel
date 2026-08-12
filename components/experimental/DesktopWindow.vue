@@ -70,7 +70,7 @@ onBeforeUnmount(() => save())
     class="fixed flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-overlay"
     :style="{ left: `${g.x}px`, top: `${g.y}px`, width: `${g.width}px`, height: `${g.height}px`, zIndex }"
     role="dialog"
-    aria-label="title"
+    :aria-label="title"
     @pointerdown="emit('focus')"
   >
     <header
