@@ -6,6 +6,7 @@
  */
 
 import type { Paginated } from './api'
+import type { RoomActionId, ServerActionId } from '~/config/action-ids'
 
 // ---------------------------------------------------------------------------
 // Permissions (contract §5, P7)
@@ -124,26 +125,8 @@ export interface AdminRoom {
   updated_at?: string
 }
 
-export type RoomActionName
-  = | 'create'
-    | 'close'
-    | 'lock'
-    | 'unlock'
-    | 'cycle'
-    | 'set_hidden'
-    | 'set_persistent'
-    | 'set_live'
-    | 'set_host'
-    | 'start'
-    | 'cancel_start'
-    | 'ready'
-    | 'set_chart'
-    | 'kick'
-    | 'force_move'
-    | 'whitelist_add'
-    | 'whitelist_remove'
-    | 'blacklist_ban'
-    | 'blacklist_unban'
+/** Room Action Registry IDs only (contract §20 / Gate0 D-5). */
+export type RoomActionName = RoomActionId
 
 export interface RoomActionArgs {
   user_id?: number
@@ -206,7 +189,7 @@ export interface ServerStatus {
   metrics?: Array<{ t: string, online: number, rooms: number, sessions: number, errors: number }>
 }
 
-export type ServerAction = 'config_reload' | 'shutdown' | 'set_room_creation' | 'set_connections' | 'update_check' | 'update_apply' | 'update_cancel' | 'update_force'
+export type ServerAction = ServerActionId
 
 // ---------------------------------------------------------------------------
 // Config — Form Descriptor (design §20.2)

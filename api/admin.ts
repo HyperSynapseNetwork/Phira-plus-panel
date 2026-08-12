@@ -1,3 +1,4 @@
+import type { RoomBatchActionId } from '~/config/action-ids'
 import type {
   ActionExecuteResult,
   AdminNotificationComposer,
@@ -110,7 +111,7 @@ export function runRoomAction(uuid: string, action: RoomActionName, args: RoomAc
 }
 /** Batch: only safe actions (kick / force_move / ban). Preview via `preview: true`. */
 export function runRoomBatchAction(
-  action: 'kick' | 'force_move' | 'ban',
+  action: RoomBatchActionId,
   roomUuids: string[],
   args: RoomActionArgs = {},
   preview = false,
@@ -146,7 +147,7 @@ export function fetchConfigSnapshots(): Promise<ConfigSnapshot[]> {
   return useApi().get('/admin/config/snapshots')
 }
 export function rollbackConfig(snapshotId: string): Promise<{ ok: true }> {
-  return useApi().post(`/admin/config/snapshots/${snapshotId}/rollback`)
+  return useApi().post('/admin/config/rollback', { snapshot_id: snapshotId })
 }
 export function fetchConfigRaw(): Promise<string> {
   return useApi().get('/admin/config/raw')
@@ -226,7 +227,7 @@ export function fetchCoupons(params?: Record<string, unknown>): Promise<Paginate
   return useApi().get('/admin/coupons', params)
 }
 export function createCoupon(payload: CouponPayload): Promise<Coupon> {
-  return useApi().post('/admin/coupons', payload)
+  return useApi().post('/admin/coupons/create', payload)
 }
 export function revokeCoupon(id: string): Promise<{ ok: true }> {
   return useApi().post(`/admin/coupons/${id}/revoke`)
@@ -252,13 +253,13 @@ export function runRunbook(id: string, args: Record<string, unknown> = {}): Prom
   return useApi().post(`/admin/automation/runbooks/${id}/run`, { args })
 }
 export function fetchRunbookRuns(params?: Record<string, unknown>): Promise<Paginated<RunbookRun>> {
-  return useApi().get('/admin/automation/runs', params)
+  return useApi().get('/admin/runbook-runs', params)
 }
 /** PROPOSED: single run detail (live current_step / step_results / definition_snapshot). */
 export function fetchRunbookRun(id: string): Promise<RunbookRun> {
-  return useApi().get(`/admin/automation/runs/${id}`)
+  return useApi().get(`/admin/runbook-runs/${id}`)
 }
 /** PROPOSED: cancel a run at the current step (only for cancellable steps). */
 export function cancelRunbookRun(id: string): Promise<{ ok: true }> {
-  return useApi().post(`/admin/automation/runs/${id}/cancel`)
+  return useApi().post(`/admin/runbook-runs/${id}/cancel`)
 }

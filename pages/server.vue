@@ -10,6 +10,7 @@ import UCard from '~/components/ui/UCard.vue'
 import UModal from '~/components/ui/UModal.vue'
 import USwitch from '~/components/ui/USwitch.vue'
 import { useAsync } from '~/composables/useAsync'
+import { SERVER_ACTION } from '~/config/action-ids'
 import { ApiError } from '~/utils/api-error'
 import { formatDuration } from '~/utils/format'
 
@@ -49,7 +50,7 @@ async function act(action: Parameters<typeof runServerAction>[0], args: Record<s
 
 function doShutdown() {
   confirmShutdown.value = false
-  void act('shutdown', { reason: 'admin' })
+  void act(SERVER_ACTION.shutdown, { reason: 'admin' })
 }
 </script>
 
@@ -116,14 +117,14 @@ function doShutdown() {
                 <span class="text-sm text-foreground">连接门控</span>
                 <USwitch
                   :model-value="status.data.value?.gates.connections ?? false"
-                  @update:model-value="v => act('set_connections', { enabled: v })"
+                  @update:model-value="v => act(SERVER_ACTION.setConnections, { enabled: v })"
                 />
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-sm text-foreground">房间创建</span>
                 <USwitch
                   :model-value="status.data.value?.gates.room_creation ?? false"
-                  @update:model-value="v => act('set_room_creation', { enabled: v })"
+                  @update:model-value="v => act(SERVER_ACTION.setRoomCreation, { enabled: v })"
                 />
               </div>
             </div>
@@ -152,13 +153,13 @@ function doShutdown() {
             更新失败：{{ status.data.value.update.error }}（下载/校验失败绝不进入 apply）。
           </p>
           <div class="mt-3 flex flex-wrap gap-2">
-            <UButton size="sm" variant="outline" :disabled="busy || !['idle', 'error'].includes(updateState)" @click="act('update_check')">
+            <UButton size="sm" variant="outline" :disabled="busy || !['idle', 'error'].includes(updateState)" @click="act(SERVER_ACTION.updateCheck)">
               检查更新
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy || !['idle', 'error'].includes(updateState)" @click="act('update_apply')">
+            <UButton size="sm" variant="outline" :disabled="busy || !['idle', 'error'].includes(updateState)" @click="act(SERVER_ACTION.updateApply)">
               {{ updateState === 'error' ? '重试应用' : '应用更新' }}
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy || updateState === 'idle' || updateState === 'error'" @click="act('update_cancel')">
+            <UButton size="sm" variant="outline" :disabled="busy || updateState === 'idle' || updateState === 'error'" @click="act(SERVER_ACTION.updateCancel)">
               取消
             </UButton>
           </div>
@@ -166,7 +167,7 @@ function doShutdown() {
 
         <UCard title="维护与启动适配器">
           <div class="flex flex-wrap gap-2">
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act('config_reload')">
+            <UButton size="sm" variant="outline" :disabled="busy" @click="act(SERVER_ACTION.configReload)">
               重载配置
             </UButton>
           </div>

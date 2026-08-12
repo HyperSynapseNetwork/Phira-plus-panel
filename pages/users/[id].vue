@@ -9,6 +9,7 @@ import UBadge from '~/components/ui/UBadge.vue'
 import UButton from '~/components/ui/UButton.vue'
 import UTabs from '~/components/ui/UTabs.vue'
 import { useAsync } from '~/composables/useAsync'
+import { USER_ACTION } from '~/config/action-ids'
 import { ApiError } from '~/utils/api-error'
 import { formatDateTime, formatDuration } from '~/utils/format'
 
@@ -220,7 +221,7 @@ function auditRow(e: AuditEvent) {
             <h3 class="text-sm font-medium text-foreground">
               活动会话
             </h3>
-            <UButton size="sm" variant="danger" @click="doAction('revoke_sessions')">
+            <UButton size="sm" variant="danger" @click="doAction(USER_ACTION.revokeSessions)">
               撤销全部会话
             </UButton>
           </div>
@@ -272,19 +273,19 @@ function auditRow(e: AuditEvent) {
             账户安全操作
           </h3>
           <div class="flex flex-wrap gap-2">
-            <UButton size="sm" variant="outline" @click="doAction('ban', { reason: 'admin' })">
+            <UButton size="sm" variant="outline" @click="doAction(USER_ACTION.ban, { reason: 'admin' })">
               封禁
             </UButton>
-            <UButton size="sm" variant="outline" @click="doAction('unban')">
+            <UButton size="sm" variant="outline" @click="doAction(USER_ACTION.unban)">
               解封
             </UButton>
-            <UButton size="sm" variant="outline" @click="doAction('kick')">
+            <UButton size="sm" variant="outline" @click="doAction(USER_ACTION.kick)">
               踢出房间
             </UButton>
-            <UButton size="sm" variant="danger" @click="doAction('ban_ip')">
+            <UButton size="sm" variant="danger" @click="doAction(USER_ACTION.banIp)">
               封禁 IP
             </UButton>
-            <UButton size="sm" variant="outline" @click="doAction('unban_ip')">
+            <UButton size="sm" variant="outline" @click="doAction(USER_ACTION.unbanIp)">
               解封 IP
             </UButton>
           </div>

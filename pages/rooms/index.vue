@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { RoomBatchActionId } from '~/config/action-ids'
 import type { AdminRoom, RoomActionResult } from '~/types/admin'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { navigateTo } from 'nuxt/app'
@@ -13,6 +14,7 @@ import UModal from '~/components/ui/UModal.vue'
 import UPagination from '~/components/ui/UPagination.vue'
 import USelect from '~/components/ui/USelect.vue'
 import { useAsync } from '~/composables/useAsync'
+import { ROOM_ACTION } from '~/config/action-ids'
 import { ApiError } from '~/utils/api-error'
 
 definePageMeta({ permissions: ['room:view'] })
@@ -110,7 +112,7 @@ const summaryCards = computed(() => {
 
 // --- batch (§18.3: kick / force_move / ban with preview + partial failure) ---
 const selected = ref(new Set<string>())
-const batchAction = ref<'kick' | 'force_move' | 'ban'>('kick')
+const batchAction = ref<RoomBatchActionId>(ROOM_ACTION.kick)
 const batchReason = ref('')
 const showBatch = ref(false)
 const batchPreview = ref<RoomActionResult[] | null>(null)
@@ -276,9 +278,9 @@ async function doCreate() {
           v-model="batchAction"
           label="动作"
           :options="[
-            { label: '踢出玩家（kick）', value: 'kick' },
-            { label: '转移玩家（force_move）', value: 'force_move' },
-            { label: '封禁（ban）', value: 'ban' },
+            { label: '踢出玩家（room.kick）', value: ROOM_ACTION.kick },
+            { label: '转移玩家（room.force_move）', value: ROOM_ACTION.forceMove },
+            { label: '封禁（room.ban）', value: ROOM_ACTION.ban },
           ]"
         />
         <UInput v-model="batchReason" label="原因（可选）" placeholder="如：维护中" />

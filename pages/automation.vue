@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Runbook, RunbookRun } from '~/types/admin'
-import { onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { cancelRunbookRun, createRunbook, deleteRunbook, fetchRunbookRun, fetchRunbookRuns, fetchRunbooks, runRunbook, updateRunbook } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
@@ -10,10 +10,15 @@ import UInput from '~/components/ui/UInput.vue'
 import UModal from '~/components/ui/UModal.vue'
 import UTextarea from '~/components/ui/UTextarea.vue'
 import { useAsync } from '~/composables/useAsync'
+import { useAuthStore } from '~/stores/auth'
 import { ApiError } from '~/utils/api-error'
 import { formatDateTime } from '~/utils/format'
 
 definePageMeta({ permissions: ['automation:view'] })
+
+const auth = useAuthStore()
+const canEdit = computed(() => auth.hasPermission(['automation:edit']))
+const canExecute = computed(() => auth.hasPermission(['automation:execute']))
 
 const runbooks = useAsync(() => fetchRunbooks({ pageNum: 100 }))
 const runs = useAsync(() => fetchRunbookRuns({ pageNum: 50 }))
@@ -170,7 +175,7 @@ const liveStep = (r: RunbookRun | null) => r?.current_step != null ? `Step ${r.c
   <div class="space-y-4">
     <PageHeader title="自动化 / Runbook" subtitle="顺序 Command + WAIT · 手动执行 · 每 step 重鉴权 + snapshot/audit（§10）">
       <template #actions>
-        <UButton size="sm" variant="primary" @click="openCreate">
+        <UButton size="sm" variant="primary" :disabled="!canEdit" @click="openCreate">
           新建 Runbook
         </UButton>
       </template>
@@ -199,13 +204,13 @@ const liveStep = (r: RunbookRun | null) => r?.current_step != null ? `Step ${r.c
               </p>
             </div>
             <div class="flex shrink-0 gap-2">
-              <UButton size="sm" variant="outline" @click="running = r">
+              <UButton size="sm" variant="outline" :disabled="!canExecute" @click="running = r">
                 运行
               </UButton>
-              <UButton size="sm" variant="outline" @click="openEdit(r)">
+              <UButton size="sm" variant="outline" :disabled="!canEdit" @click="openEdit(r)">
                 编辑
               </UButton>
-              <UButton size="sm" variant="danger" @click="deleteTarget = r">
+              <UButton size="sm" variant="danger" :disabled="!canEdit" @click="deleteTarget = r">
                 删除
               </UButton>
             </div>

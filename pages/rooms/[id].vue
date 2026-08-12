@@ -11,6 +11,7 @@ import UInput from '~/components/ui/UInput.vue'
 import UModal from '~/components/ui/UModal.vue'
 import USelect from '~/components/ui/USelect.vue'
 import { useAsync } from '~/composables/useAsync'
+import { ROOM_ACTION } from '~/config/action-ids'
 import { ApiError } from '~/utils/api-error'
 import { formatDateTime } from '~/utils/format'
 
@@ -34,12 +35,12 @@ const setChartOpen = ref(false)
 const setHostOpen = ref(false)
 const hostId = ref('')
 
-const listAction = ref<'whitelist_add' | 'whitelist_remove' | 'blacklist_ban' | 'blacklist_unban'>('whitelist_add')
+const listAction = ref<RoomActionName>(ROOM_ACTION.whitelistAdd)
 const listUserId = ref('')
 const listOpen = ref(false)
 
 function doSetHost() {
-  void act('set_host', { host_id: hostId.value ? Number(hostId.value) : undefined })
+  void act(ROOM_ACTION.setHost, { host_id: hostId.value ? Number(hostId.value) : undefined })
   setHostOpen.value = false
 }
 
@@ -68,17 +69,17 @@ async function act(action: RoomActionName, args: RoomActionArgs = {}) {
 }
 
 function doKick() {
-  void act('kick', { user_id: kickArgs.value.user_id ? Number(kickArgs.value.user_id) : undefined, reason: kickArgs.value.reason })
+  void act(ROOM_ACTION.kick, { user_id: kickArgs.value.user_id ? Number(kickArgs.value.user_id) : undefined, reason: kickArgs.value.reason })
   kickOpen.value = false
 }
 
 function doMove() {
-  void act('force_move', { user_id: moveArgs.value.user_id ? Number(moveArgs.value.user_id) : undefined, target_room_uuid: moveArgs.value.target_room_uuid })
+  void act(ROOM_ACTION.forceMove, { user_id: moveArgs.value.user_id ? Number(moveArgs.value.user_id) : undefined, target_room_uuid: moveArgs.value.target_room_uuid })
   moveOpen.value = false
 }
 
 function doSetChart() {
-  void act('set_chart', { chart_id: setChartId.value ? Number(setChartId.value) : undefined })
+  void act(ROOM_ACTION.setChart, { chart_id: setChartId.value ? Number(setChartId.value) : undefined })
   setChartOpen.value = false
 }
 
@@ -184,37 +185,37 @@ const stateTone = (s: string) => (s === 'playing' ? 'success' : s === 'select_ch
             动作
           </h3>
           <div class="flex flex-wrap gap-2">
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act('lock')">
+            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.lock)">
               锁定
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act('unlock')">
+            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.unlock)">
               解锁
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act('cycle')">
+            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.cycle)">
               切谱
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act('set_hidden', { content: '' })">
+            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.setHidden, { content: '' })">
               切换隐藏
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act('set_persistent')">
+            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.setPersistent)">
               切换持久
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act('set_live')">
+            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.setLive)">
               切换 Live
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act('start')">
+            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.start)">
               开始
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act('cancel_start')">
+            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.cancelStart)">
               取消开始
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act('ready')">
+            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.ready)">
               准备
             </UButton>
             <UButton size="sm" variant="outline" :disabled="busy" @click="setChartOpen = true">
               选谱
             </UButton>
-            <UButton size="sm" variant="danger" :disabled="busy" @click="act('close')">
+            <UButton size="sm" variant="danger" :disabled="busy" @click="act(ROOM_ACTION.close)">
               关闭房间
             </UButton>
           </div>
@@ -322,10 +323,10 @@ const stateTone = (s: string) => (s === 'playing' ? 'success' : s === 'select_ch
           v-model="listAction"
           label="动作"
           :options="[
-            { label: '白名单：添加', value: 'whitelist_add' },
-            { label: '白名单：移除', value: 'whitelist_remove' },
-            { label: '黑名单：封禁', value: 'blacklist_ban' },
-            { label: '黑名单：解封', value: 'blacklist_unban' },
+            { label: '白名单：添加', value: ROOM_ACTION.whitelistAdd },
+            { label: '白名单：移除', value: ROOM_ACTION.whitelistRemove },
+            { label: '黑名单：封禁', value: ROOM_ACTION.blacklistBan },
+            { label: '黑名单：解封', value: ROOM_ACTION.blacklistUnban },
           ]"
         />
         <UInput v-model="listUserId" type="number" label="用户 Phira ID" placeholder="目标用户 id" />
