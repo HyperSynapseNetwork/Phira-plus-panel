@@ -29,6 +29,7 @@ describe('auth store (root login / session)', () => {
 
   it('login stores a root session with must_change_password', async () => {
     apiMock.post.mockResolvedValue({ principal_type: 'root', must_change_password: true })
+    apiMock.get.mockResolvedValue({ principal: 'root', csrf_token: 'tok', capabilities: [] })
     const auth = useAuthStore()
     await auth.login('secret')
     expect(apiMock.post).toHaveBeenCalledWith('/admin/auth/root/login', { password: 'secret' })
@@ -52,18 +53,35 @@ describe('auth store (root login / session)', () => {
     expect(auth.requiresPasswordChange).toBe(false)
   })
 
-  it('loadSession applies the server session when authenticated', async () => {
+  it('loadSession applies the root session from /me (contract §20)', async () => {
     apiMock.get.mockResolvedValue({
-      authenticated: true,
-      principal_type: 'root',
-      must_change_password: false,
+      principal: 'root',
       permissions: ['*:*'],
+      capabilities: [],
+      csrf_token: 'tok',
     })
     const auth = useAuthStore()
     await auth.loadSession()
+    expect(apiMock.get).toHaveBeenCalledWith('/me')
     expect(auth.initialized).toBe(true)
     expect(auth.isAuthenticated).toBe(true)
     expect(auth.isRoot).toBe(true)
+  })
+
+  it('loadSession applies a normal admin session (user principal + group perms)', async () => {
+    apiMock.get.mockResolvedValue({
+      principal: 'user',
+      user: { id: 'u1', phira_id: 123 },
+      permissions: ['room:view', 'dashboard:view'],
+      capabilities: ['rooms.v1'],
+      csrf_token: 'tok',
+    })
+    const auth = useAuthStore()
+    await auth.loadSession()
+    expect(auth.isAuthenticated).toBe(true)
+    expect(auth.isRoot).toBe(false)
+    expect(auth.isNormalAdmin).toBe(true)
+    expect(auth.permissions).toContain('room:view')
   })
 
   it('loadSession stays guest when the backend is offline', async () => {

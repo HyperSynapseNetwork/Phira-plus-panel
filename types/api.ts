@@ -73,3 +73,31 @@ export interface PublicMeta {
     capabilities: string[]
   }
 }
+
+/**
+ * Session probe — contract §20: `GET /api/v1/me` is the ONLY identity
+ * interface. Returns the principal (root | user), runtime-resolved
+ * permissions/capabilities, session metadata, and the CSRF token (§21).
+ * `/me/profile` no longer acts as a session probe.
+ */
+export interface MeSession {
+  principal: 'root' | 'user' | 'guest'
+  /** Present when principal === 'user' (normal admin, Phira login + group). */
+  user?: {
+    id: string
+    phira_id: number
+    username?: string
+    avatar_url?: string
+  }
+  permissions: string[]
+  capabilities: string[]
+  session?: {
+    sid: string
+    client_type: string
+    created_at: string
+  }
+  /** CSRF token for state-changing requests (contract §20/§21). */
+  csrf_token?: string
+  /** Root first-login must change password (design §6.8). */
+  must_change_password?: boolean
+}

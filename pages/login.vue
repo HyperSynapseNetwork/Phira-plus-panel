@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRuntimeConfig } from 'nuxt/app'
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import UButton from '~/components/ui/UButton.vue'
@@ -14,6 +15,7 @@ definePageMeta({
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
+const config = useRuntimeConfig()
 
 const password = ref('')
 const errorMessage = ref('')
@@ -42,6 +44,18 @@ function errorText(err: unknown): string {
   return '登录失败，请重试'
 }
 
+/**
+ * Normal-admin login (contract §20: ordinary PPB User via Phira login +
+ * group membership can enter Panel). Redirect to the PPB Auth Gateway (P13);
+ * after return the /me session probe authenticates the session.
+ */
+function phiraLoginUrl(): string {
+  const base = config.public.apiBase
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const returnTo = `${origin}/`
+  return `${base}/auth/phira/login?return_to=${encodeURIComponent(returnTo)}`
+}
+
 async function submit() {
   busy.value = true
   errorMessage.value = ''
@@ -68,11 +82,24 @@ async function submit() {
   <form class="space-y-4" @submit.prevent="submit">
     <div>
       <h2 class="text-lg font-semibold text-foreground">
-        Root 登录
+        管理员登录
       </h2>
       <p class="mt-1 text-sm text-muted">
-        首次启动的随机密码由服务端 CLI 输出。
+        普通管理员使用 Phira 账号（组成员）登录；Root 为应急本地主体。
       </p>
+    </div>
+
+    <a
+      :href="phiraLoginUrl()"
+      class="flex w-full items-center justify-center rounded bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent/90"
+    >
+      使用 Phira 账号登录
+    </a>
+
+    <div class="flex items-center gap-2 text-xs text-muted">
+      <span class="h-px flex-1 bg-border" />
+      Root 密码登录
+      <span class="h-px flex-1 bg-border" />
     </div>
 
     <UInput

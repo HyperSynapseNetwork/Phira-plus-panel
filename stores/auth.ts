@@ -1,12 +1,18 @@
+import type { MeSession } from '~/types/api'
 import { defineStore } from 'pinia'
 import { useApi } from '~/composables/useApi'
+import { clearCsrfToken, setCsrfToken } from '~/utils/csrf'
 
 export type PrincipalType = 'guest' | 'root' | 'user'
 
 /**
- * PROPOSED contract — pending freeze (see docs/PHASE_A_PLAN.md).
- * Design §6.8: Root is a local principal (user_id = NULL), password-only login.
+ * Contract §20: `GET /api/v1/me` is the ONLY identity interface. Root is a
+ * separate emergency/local principal (user_id = NULL); normal admins are
+ * ordinary PPB Users (Phira login + group membership) whose permissions are
+ * resolved at runtime by PPB.
  */
+
+/** Root password login (design §6.8, contract §15 P2) — unchanged. */
 export interface RootLoginRequest {
   password: string
 }
@@ -15,14 +21,6 @@ export interface RootLoginResponse {
   principal_type: 'root'
   /** First-login default random password must be changed (design §6.8). */
   must_change_password: boolean
-}
-
-export interface RootSessionResponse {
-  authenticated: boolean
-  principal_type: 'root'
-  must_change_password: boolean
-  /** Root has `*:*`; server may return it as `['*:*']`. */
-  permissions: string[]
 }
 
 export interface ChangePasswordRequest {
@@ -41,17 +39,21 @@ export interface AuthState {
   isRoot: boolean
   /** Effective permission ids for the current principal (empty for root). */
   permissions: string[]
+  /** PPB capabilities from `/me` (feature detection, contract §9). */
+  capabilities: string[]
   /** Session has been probed at least once (even when offline). */
   initialized: boolean
   loading: boolean
 }
 
-export function applySession(state: AuthState, session: RootSessionResponse): void {
-  state.authenticated = session.authenticated
-  state.principalType = session.principal_type
-  state.isRoot = session.principal_type === 'root'
-  state.mustChangePassword = session.must_change_password
+export function applySession(state: AuthState, session: MeSession): void {
+  state.authenticated = session.principal === 'root' || session.principal === 'user'
+  state.principalType = session.principal === 'guest' ? 'guest' : session.principal
+  state.isRoot = session.principal === 'root'
+  state.mustChangePassword = session.must_change_password ?? false
   state.permissions = session.permissions ?? []
+  state.capabilities = session.capabilities ?? []
+  setCsrfToken(session.csrf_token ?? null)
 }
 
 export function resetSession(state: AuthState): void {
@@ -60,6 +62,8 @@ export function resetSession(state: AuthState): void {
   state.isRoot = false
   state.mustChangePassword = false
   state.permissions = []
+  state.capabilities = []
+  clearCsrfToken()
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -69,6 +73,7 @@ export const useAuthStore = defineStore('auth', {
     mustChangePassword: false,
     isRoot: false,
     permissions: [],
+    capabilities: [],
     initialized: false,
     loading: false,
   }),
@@ -76,20 +81,22 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isAuthenticated: state => state.authenticated,
     requiresPasswordChange: state => state.authenticated && state.mustChangePassword,
+    /** True for normal (non-Root) admin principals. */
+    isNormalAdmin: state => state.authenticated && state.principalType === 'user',
   },
 
   actions: {
     /**
-     * Probe the PPB session on app start (called by the session plugin and
-     * by the auth middleware as a guard). Session cookie is HttpOnly; the
-     * frontend never holds the JWT (design §6.4). Idempotent.
+     * Probe the session from `GET /me` on app start (session plugin + auth
+     * middleware). Session cookie is HttpOnly; the frontend never holds the
+     * JWT (design §6.4). The response also carries the CSRF token (§20/§21).
      */
     async loadSession(): Promise<void> {
       if (this.initialized)
         return
       const api = useApi()
       try {
-        const session = await api.get<RootSessionResponse>('/admin/auth/root/session')
+        const session = await api.get<MeSession>('/me')
         applySession(this, session)
       }
       catch {
@@ -101,17 +108,27 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    /** Root password login (emergency/local principal, design §6.8). */
     async login(password: string): Promise<void> {
       const api = useApi()
       this.loading = true
       try {
         const res = await api.post<RootLoginResponse>('/admin/auth/root/login', { password } satisfies RootLoginRequest)
         this.authenticated = true
-        this.principalType = res.principal_type ?? 'root'
-        this.isRoot = res.principal_type === 'root'
+        this.principalType = 'root'
+        this.isRoot = true
         this.mustChangePassword = res.must_change_password ?? false
         this.permissions = ['*:*']
         this.initialized = true
+        // Re-probe /me so the CSRF token for the new session is captured.
+        try {
+          const session = await api.get<MeSession>('/me')
+          setCsrfToken(session.csrf_token ?? null)
+          this.capabilities = session.capabilities ?? []
+        }
+        catch {
+          // Best-effort; writes will refresh via the CSRF path.
+        }
       }
       finally {
         this.loading = false
@@ -140,9 +157,9 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /**
-     * Permission gate (Phase A stub). Empty list ⇒ any authenticated
-     * principal. Root (`*:*`) passes everything. Later wired to the
-     * PPB Permission Manifest — the full set is never hardcoded here.
+     * Permission gate. Empty list ⇒ any authenticated principal. Root (`*:*`)
+     * passes everything. Normal admins are matched against the runtime-resolved
+     * `/me` permissions (contract §20). The full set is never hardcoded here.
      */
     hasPermission(required: string[]): boolean {
       if (!required || required.length === 0)
