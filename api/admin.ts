@@ -157,7 +157,8 @@ export function fetchConfigRaw(): Promise<string> {
   return useApi().get('/admin/config/raw')
 }
 export function saveConfigRaw(raw: string): Promise<{ ok: true }> {
-  return useApi().post('/admin/config/raw', { raw })
+  // ConfigContentBody `{content}` (design §20.3) — validated before apply.
+  return useApi().post('/admin/config/save', { content: raw, note: 'panel raw edit' })
 }
 
 // --- Plugins (§18.8) -------------------------------------------------------
@@ -257,13 +258,13 @@ export function runRunbook(id: string, args: Record<string, unknown> = {}): Prom
   return useApi().post(`/admin/automation/runbooks/${id}/run`, { args })
 }
 export function fetchRunbookRuns(params?: Record<string, unknown>): Promise<Paginated<RunbookRun>> {
-  return useApi().get('/admin/runbook-runs', params)
+  return useApi().get('/admin/automation/runbook-runs', params)
 }
 /** Single run detail (live current_step / step_results / definition_snapshot). */
 export function fetchRunbookRun(id: string): Promise<RunbookRun> {
-  return useApi().get(`/admin/runbook-runs/${id}`)
+  return useApi().get(`/admin/automation/runbook-runs/${id}`)
 }
 /** Cancel a run at the current step (only for cancellable steps). */
 export function cancelRunbookRun(id: string): Promise<{ ok: true }> {
-  return useApi().post(`/admin/runbook-runs/${id}/cancel`)
+  return useApi().post(`/admin/automation/runbook-runs/${id}/cancel`)
 }
