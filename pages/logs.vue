@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { LogEntry } from '~/types/admin'
+import { useRuntimeConfig } from 'nuxt/app'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { fetchLogs, translateLog } from '~/api/admin'
@@ -26,7 +27,8 @@ const selected = ref<LogEntry | null>(null)
 const translation = ref<ReturnType<typeof localTranslate>>(null)
 
 let highlightTimer: ReturnType<typeof setTimeout> | null = null
-let liveTimer: ReturnType<typeof setInterval> | null = null
+let es: EventSource | null = null
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const list = useAsync(() => fetchLogs({
   service: service.value || undefined,
@@ -53,21 +55,72 @@ onBeforeUnmount(() => {
 
 function stopLive() {
   live.value = false
-  if (liveTimer) {
-    clearInterval(liveTimer)
-    liveTimer = null
+  es?.close()
+  es = null
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
   }
 }
 
+/**
+ * Live Logs via SSE (`GET /api/v1/admin/events`, contract §1/§3). EventSource
+ * auto-reconnects and sends Last-Event-ID. If SSE is unavailable the client
+ * falls back to 3s polling so live mode never silently dies.
+ */
 function toggleLive() {
   live.value = !live.value
-  if (live.value) {
-    void list.run()
-    liveTimer = setInterval(() => void list.run(), 3000)
+  if (!live.value) {
+    stopLive()
+    return
   }
-  else if (liveTimer) {
-    clearInterval(liveTimer)
-    liveTimer = null
+  void list.run()
+  const config = useRuntimeConfig()
+  const baseURL = `${config.public.apiBase}/api/v1`
+  try {
+    es = new EventSource(`${baseURL}/admin/events`, { withCredentials: true })
+    es.onmessage = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.data) as unknown
+        const entry = extractLogEntry(parsed)
+        if (entry)
+          prependLog(entry)
+      }
+      catch {
+        // non-JSON / unknown envelope — ignore
+      }
+    }
+    es.onerror = () => startPollFallback()
+  }
+  catch {
+    startPollFallback()
+  }
+}
+
+function startPollFallback() {
+  if (pollTimer)
+    return
+  pollTimer = setInterval(() => void list.run(), 3000)
+}
+
+/** Pull a LogEntry out of the §3 SSE envelope (`data` may be the entry). */
+function extractLogEntry(ev: unknown): LogEntry | null {
+  const envelope = ev as { type?: string, data?: unknown }
+  const data = envelope?.data as Partial<LogEntry> | undefined
+  if (data && typeof data === 'object' && 'log_id' in data && 'message' in data && 'timestamp' in data)
+    return data as LogEntry
+  return null
+}
+
+function prependLog(e: LogEntry) {
+  const items = list.data.value?.items ?? []
+  if (items.some(x => x.log_id === e.log_id))
+    return
+  list.data.value = {
+    items: [e, ...items].slice(0, 500),
+    total: (list.data.value?.total ?? items.length) + 1,
+    page: 1,
+    pageNum: 200,
   }
 }
 
