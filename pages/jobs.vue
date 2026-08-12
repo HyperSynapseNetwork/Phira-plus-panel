@@ -40,7 +40,7 @@ const stateTone = (s: string) => (s === 'succeeded' ? 'success' : s === 'failed'
 
 <template>
   <div>
-    <PageHeader title="任务" subtitle="queued → running(stage/progress) → succeeded / failed / cancelled（§9.4）">
+    <PageHeader title="任务" subtitle="queued → running(stage) → succeeded / failed / cancelled（§9.4 / §22：无假百分比）">
       <template #actions>
         <UButton size="sm" variant="outline" @click="jobs.run()">
           刷新
@@ -67,9 +67,6 @@ const stateTone = (s: string) => (s === 'succeeded' ? 'success' : s === 'failed'
                 阶段
               </th>
               <th class="px-3 py-2 font-medium">
-                进度
-              </th>
-              <th class="px-3 py-2 font-medium">
                 创建
               </th>
               <th class="px-3 py-2 font-medium">
@@ -91,16 +88,13 @@ const stateTone = (s: string) => (s === 'succeeded' ? 'success' : s === 'failed'
                 </UBadge>
               </td>
               <td class="px-3 py-2 text-muted">
-                {{ j.stage ?? '—' }}
-              </td>
-              <td class="px-3 py-2 text-muted">
-                {{ j.progress != null ? `${Math.round(j.progress * 100)}%` : '—' }}
+                {{ j.stage || '—' }}
               </td>
               <td class="px-3 py-2 text-muted">
                 {{ formatDateTime(j.created_at) }}
               </td>
               <td class="px-3 py-2 text-muted">
-                {{ formatDateTime(j.finished_at) }}
+                {{ formatDateTime(j.finished_at ?? undefined) }}
               </td>
               <td class="px-3 py-2">
                 <UButton

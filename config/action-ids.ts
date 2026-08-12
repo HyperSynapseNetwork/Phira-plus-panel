@@ -11,8 +11,8 @@
 export const ROOM_ACTION = {
   create: 'room.create',
   close: 'room.close',
+  /** §22: `room.lock { locked: bool }` — unlock is `room.lock { locked: false }`. */
   lock: 'room.lock',
-  unlock: 'room.unlock',
   cycle: 'room.cycle',
   setHidden: 'room.set_hidden',
   setPersistent: 'room.set_persistent',

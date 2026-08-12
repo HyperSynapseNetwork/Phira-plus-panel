@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { NotificationAction } from '~/types/admin'
 import { computed, ref } from 'vue'
 import { fetchNotificationDelivery, sendAdminNotification } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
@@ -24,8 +25,20 @@ const form = ref({
   userIds: '',
 })
 const actionLabel = ref('')
-const actionType = ref('')
-const actions = ref<Array<{ label: string, action: string }>>([])
+const actionType = ref<NotificationAction>('open_room')
+const actions = ref<Array<{ label: string, action: NotificationAction }>>([])
+
+/** §22 whitelist — the ONLY notification action values allowed. */
+const ACTION_OPTIONS: Array<{ label: string, value: NotificationAction }> = [
+  { label: '加入房间（join_room）', value: 'join_room' },
+  { label: '接受好友（friend_accept）', value: 'friend_accept' },
+  { label: '拒绝好友（friend_reject）', value: 'friend_reject' },
+  { label: '打开谱面（open_chart）', value: 'open_chart' },
+  { label: '打开 Replay（open_replay）', value: 'open_replay' },
+  { label: '打开房间（open_room）', value: 'open_room' },
+  { label: '打开用户（open_user）', value: 'open_user' },
+  { label: '打开主页（open_profile）', value: 'open_profile' },
+]
 const busy = ref(false)
 const msg = ref('')
 
@@ -51,7 +64,7 @@ function addAction() {
     return
   actions.value.push({ label: actionLabel.value, action: actionType.value })
   actionLabel.value = ''
-  actionType.value = ''
+  actionType.value = 'open_room'
 }
 
 async function send() {
@@ -119,11 +132,14 @@ const statusTone = (s: string) => (s === 'delivered' ? 'success' : s === 'failed
         </p>
         <div class="flex gap-2">
           <UInput v-model="actionLabel" placeholder="按钮文字" />
-          <UInput v-model="actionType" placeholder="action（如 room.force_move）" />
+          <USelect v-model="actionType" :options="ACTION_OPTIONS" />
           <UButton size="sm" variant="outline" @click="addAction">
             添加
           </UButton>
         </div>
+        <p class="mt-1 text-xs text-muted">
+          action 仅限 §22 白名单（不塞任意 Action Registry ID）。
+        </p>
         <div class="mt-2 flex flex-wrap gap-1">
           <UBadge v-for="(a, i) in actions" :key="i" tone="accent">
             {{ a.label }} → {{ a.action }}

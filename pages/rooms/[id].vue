@@ -185,10 +185,10 @@ const stateTone = (s: string) => (s === 'playing' ? 'success' : s === 'select_ch
             动作
           </h3>
           <div class="flex flex-wrap gap-2">
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.lock)">
+            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.lock, { locked: true })">
               锁定
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.unlock)">
+            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.lock, { locked: false })">
               解锁
             </UButton>
             <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.cycle)">
