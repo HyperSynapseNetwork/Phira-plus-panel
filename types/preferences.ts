@@ -26,6 +26,10 @@ export interface PanelPreferencesData {
   density: Density
   /** Log viewer: wrap long lines. */
   log_wrap: boolean
+  /** Log viewer: auto-scroll to newest (live). */
+  log_autoscroll: boolean
+  /** Log viewer: which levels are shown by default. */
+  log_levels: string[]
   /** Console behavior. */
   console: {
     font_size: number
@@ -39,6 +43,8 @@ export interface PanelPreferencesData {
   desktop_window: {
     enabled: boolean
   }
+  /** Low-performance mode (§22.8): disable charts animation, heavy effects. */
+  low_performance: boolean
 }
 
 export const DEFAULT_PANEL_PREFS: PanelPreferencesData = {
@@ -50,6 +56,8 @@ export const DEFAULT_PANEL_PREFS: PanelPreferencesData = {
   page_size: 25,
   density: 'compact',
   log_wrap: true,
+  log_autoscroll: true,
+  log_levels: ['error', 'warn', 'info'],
   console: {
     font_size: 13,
     history_limit: 100,
@@ -60,6 +68,7 @@ export const DEFAULT_PANEL_PREFS: PanelPreferencesData = {
   desktop_window: {
     enabled: false,
   },
+  low_performance: false,
 }
 
 /** PPB preference record for the `panel` namespace. */

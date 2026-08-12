@@ -59,6 +59,14 @@ describe('preferences store (namespace panel)', () => {
     expect(prefs.density).toBe('comfortable')
   })
 
+  it('defaults include the advanced panel prefs (§21.1/§22.5/§22.8)', () => {
+    expect(DEFAULT_PANEL_PREFS.desktop_window.enabled).toBe(false)
+    expect(DEFAULT_PANEL_PREFS.low_performance).toBe(false)
+    expect(DEFAULT_PANEL_PREFS.log_autoscroll).toBe(true)
+    expect(DEFAULT_PANEL_PREFS.log_levels).toContain('error')
+    expect(DEFAULT_PANEL_PREFS.dashboard_layout).toBe('grid')
+  })
+
   it('save sends the revision for optimistic concurrency', async () => {
     apiMock.put.mockResolvedValue({
       user_id: 'u1',

@@ -7,6 +7,8 @@ import { usePreferencesStore } from '~/stores/preferences'
 /**
  * Dashboard chart summary card. Chart type + time range are remembered per
  * chart id in the `panel` preference namespace (§21.1 / §18.2).
+ * Animations are disabled under low-performance mode (§22.8) or the OS
+ * reduced-motion setting (§22.7).
  */
 const props = withDefaults(defineProps<{
   title: string
@@ -17,9 +19,11 @@ const props = withDefaults(defineProps<{
 })
 
 const prefs = usePreferencesStore()
+const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
 
 const chartType = computed<ChartKind>(() => prefs.data.per_chart_type[props.chartId] ?? 'line')
 const timeRange = computed<string>(() => prefs.data.per_chart_range[props.chartId] ?? '24h')
+const noAnimation = computed(() => prefs.data.low_performance || reducedMotion.value)
 
 function setChartType(type: ChartKind) {
   prefs.update({ per_chart_type: { ...prefs.data.per_chart_type, [props.chartId]: type } })
@@ -29,6 +33,7 @@ const option = computed(() => {
   const data = props.data
   if (chartType.value === 'pie') {
     return {
+      animation: !noAnimation.value,
       tooltip: { trigger: 'item' },
       series: [{
         type: 'pie',
@@ -38,6 +43,7 @@ const option = computed(() => {
     }
   }
   return {
+    animation: !noAnimation.value,
     tooltip: { trigger: 'axis' },
     grid: { left: 8, right: 8, top: 24, bottom: 28, containLabel: true },
     xAxis: { type: 'category', data: data.map(([name]) => name) },
@@ -46,7 +52,7 @@ const option = computed(() => {
       name: props.title,
       type: chartType.value === 'bar' ? 'bar' : 'line',
       data: data.map(([, value]) => value),
-      smooth: true,
+      smooth: !noAnimation.value,
     }],
   }
 })
