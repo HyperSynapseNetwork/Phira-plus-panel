@@ -21,6 +21,9 @@ export default antfu(
       // Generated from the PPB OpenAPI contract (scripts/gen-types.sh) —
       // linted by openapi-typescript upstream, not by the panel.
       '**/types/generated.ts',
+      // Standalone Node tooling (contract-consistency checker, type regen) —
+      // not part of the app lint surface (same convention as PPF).
+      '**/scripts/**',
     ],
   },
   {
