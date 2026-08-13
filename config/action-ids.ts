@@ -9,7 +9,6 @@
  */
 
 export const ROOM_ACTION = {
-  create: 'room.create',
   close: 'room.close',
   /** §22: `room.lock { locked: bool }` — unlock is `room.lock { locked: false }`. */
   lock: 'room.lock',
@@ -27,8 +26,8 @@ export const ROOM_ACTION = {
   ban: 'room.ban',
   whitelistAdd: 'room.whitelist_add',
   whitelistRemove: 'room.whitelist_remove',
-  blacklistBan: 'room.blacklist_ban',
-  blacklistUnban: 'room.blacklist_unban',
+  blacklistBan: 'room.ban',
+  blacklistUnban: 'room.unban',
 } as const
 
 export type RoomActionId = (typeof ROOM_ACTION)[keyof typeof ROOM_ACTION]
@@ -36,22 +35,22 @@ export type RoomActionId = (typeof ROOM_ACTION)[keyof typeof ROOM_ACTION]
 export const SERVER_ACTION = {
   configReload: 'server.config_reload',
   shutdown: 'server.shutdown',
-  setConnections: 'server.set_connections',
-  setRoomCreation: 'server.set_room_creation',
-  updateCheck: 'server.update_check',
-  updateApply: 'server.update_apply',
-  updateCancel: 'server.update_cancel',
-  updateForce: 'server.update_force',
+  setConnections: 'server.connections',
+  setRoomCreation: 'server.roomcreation',
+  updateCheck: 'pmp.update.check',
+  updateApply: 'pmp.update.apply',
+  updateCancel: 'pmp.update.cancel',
+  updateForce: 'pmp.update.force',
 } as const
 
 export type ServerActionId = (typeof SERVER_ACTION)[keyof typeof SERVER_ACTION]
 
 export const USER_ACTION = {
-  ban: 'user.ban',
-  unban: 'user.unban',
-  kick: 'user.kick',
-  banIp: 'user.ban_ip',
-  unbanIp: 'user.unban_ip',
+  ban: 'player.ban',
+  unban: 'player.unban',
+  kick: 'player.kick',
+  banIp: 'player.ban_ip',
+  unbanIp: 'player.unban_ip',
   revokeSessions: 'user.revoke_sessions',
 } as const
 
