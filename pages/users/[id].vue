@@ -5,10 +5,12 @@ import { useRoute } from 'vue-router'
 import { fetchGroups, fetchUser, fetchUserAudit, fetchUserMultiplayer, fetchUserSecurity, fetchUserSessions, runUserAction } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
+import ReauthModal from '~/components/admin/ReauthModal.vue'
 import UBadge from '~/components/ui/UBadge.vue'
 import UButton from '~/components/ui/UButton.vue'
 import UTabs from '~/components/ui/UTabs.vue'
 import { useAsync } from '~/composables/useAsync'
+import { useReauth } from '~/composables/useReauth'
 import { USER_ACTION } from '~/config/action-ids'
 import { usePermissionsStore } from '~/stores/permissions'
 import { ApiError } from '~/utils/api-error'
@@ -48,9 +50,12 @@ watch(tab, (t) => {
 
 const account = computed(() => user.data.value?.account)
 
+// §23 #3: `groups` is `GroupRef[] = [{id, name}]` — join with the full group
+// list to show is_default / system_kind for the effective-permission preview.
 const userGroups = computed(() => {
   const all = groups.data.value?.items ?? []
-  const ids = user.data.value?.groups ?? []
+  const refs = user.data.value?.groups ?? []
+  const ids = refs.map(r => r.id)
   return all.filter(g => ids.includes(g.id))
 })
 
@@ -64,16 +69,36 @@ const effectivePerms = computed<string[]>(() => {
 
 const permLabel = (id: string): string => permStore.find(id)?.label ?? id
 
-async function doAction(action: string, args: Record<string, unknown> = {}) {
+/** §23 #5: ip_history is a dynamic PMP payload — render as JSON. */
+const ipHistoryJson = computed(() => JSON.stringify(security.data.value?.ip_history ?? [], null, 2))
+
+const reauth = useReauth()
+
+// §23 #10: ban / unban / ban_ip / unban_ip require reauth; kick / revoke do not.
+const REAUTH_ACTIONS = new Set<string>([USER_ACTION.ban, USER_ACTION.unban, USER_ACTION.banIp, USER_ACTION.unbanIp])
+
+async function doAction(action: string, args: Record<string, unknown> = {}, reauthToken?: string) {
   actionMsg.value = ''
   try {
-    await runUserAction(phiraId.value, action, args)
+    await runUserAction(phiraId.value, action, args, reauthToken)
     actionMsg.value = `操作 ${action} 已提交`
     void security.run()
     void multiplayer.run()
   }
   catch (err) {
     actionMsg.value = err instanceof ApiError ? err.message : '操作失败'
+  }
+}
+
+/** Route the click through reauth when the action is sensitive. */
+function dispatchAction(action: string, args: Record<string, unknown> = {}) {
+  if (REAUTH_ACTIONS.has(action)) {
+    reauth.requireReauth(async (token) => {
+      await doAction(action, args, token)
+    })
+  }
+  else {
+    void doAction(action, args)
   }
 }
 
@@ -179,30 +204,30 @@ function auditRow(e: AuditEvent) {
           <dl class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
             <div>
               <dt class="text-xs text-muted">
-                当前房间
-              </dt><dd class="text-foreground">
-                {{ multiplayer.data.value?.current_room?.name ?? '—' }}
+                在线
+              </dt><dd :class="multiplayer.data.value?.online ? 'text-success' : 'text-muted'">
+                {{ multiplayer.data.value?.online ? '在线' : '离线' }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                访问次数
-              </dt><dd class="text-foreground">
-                {{ multiplayer.data.value?.visit_history_count ?? '—' }}
+                当前房间
+              </dt><dd class="font-mono text-foreground">
+                {{ multiplayer.data.value?.current_room ?? '—' }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
                 游玩时长
               </dt><dd class="text-foreground">
-                {{ formatDuration(multiplayer.data.value?.playtime_secs) }}
+                {{ formatDuration(multiplayer.data.value?.playtime_secs ?? undefined) }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
                 Rounds
               </dt><dd class="text-foreground">
-                {{ multiplayer.data.value?.rounds_count ?? '—' }}
+                {{ multiplayer.data.value?.rounds_played ?? '—' }}
               </dd>
             </div>
             <div>
@@ -215,8 +240,8 @@ function auditRow(e: AuditEvent) {
             <div>
               <dt class="text-xs text-muted">
                 封禁状态
-              </dt><dd class="text-foreground">
-                {{ multiplayer.data.value?.ban_state ?? '—' }}
+              </dt><dd :class="multiplayer.data.value?.ban_state ? 'text-danger' : 'text-foreground'">
+                {{ multiplayer.data.value?.ban_state ? '已封禁' : '未封禁' }}
               </dd>
             </div>
           </dl>
@@ -260,7 +285,7 @@ function auditRow(e: AuditEvent) {
 
     <!-- Sessions / Identity -->
     <div v-else-if="tab === 'sessions'" class="mt-4">
-      <AsyncState :loading="sessions.loading.value" :error="sessions.error.value" :empty="(sessions.data.value ?? []).length === 0">
+      <AsyncState :loading="sessions.loading.value" :error="sessions.error.value" :empty="(sessions.data.value?.items ?? []).length === 0">
         <section class="rounded-lg border border-border bg-surface p-4">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="text-sm font-medium text-foreground">
@@ -278,27 +303,27 @@ function auditRow(e: AuditEvent) {
                 </th><th class="px-2 py-1">
                   设备
                 </th><th class="px-2 py-1">
-                  创建
+                  IP
                 </th><th class="px-2 py-1">
-                  最后活跃
+                  创建
                 </th><th class="px-2 py-1">
                   状态
                 </th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="s in sessions.data.value ?? []" :key="s.id" class="border-b border-border last:border-0">
+              <tr v-for="s in sessions.data.value?.items ?? []" :key="s.id" class="border-b border-border last:border-0">
                 <td class="px-2 py-1.5">
                   {{ s.client_type }}
                 </td>
                 <td class="px-2 py-1.5 text-muted">
-                  {{ s.device_name ?? '—' }}
+                  {{ s.device_name || '—' }}
+                </td>
+                <td class="px-2 py-1.5 font-mono text-xs text-muted">
+                  {{ s.ip || '—' }}
                 </td>
                 <td class="px-2 py-1.5 text-muted">
                   {{ formatDateTime(s.created_at) }}
-                </td>
-                <td class="px-2 py-1.5 text-muted">
-                  {{ formatDateTime(s.last_seen_at) }}
                 </td>
                 <td class="px-2 py-1.5">
                   <span class="text-xs" :class="s.revoked_at ? 'text-danger' : 'text-success'">{{ s.revoked_at ? 'revoked' : 'active' }}</span>
@@ -318,19 +343,19 @@ function auditRow(e: AuditEvent) {
             账户安全操作
           </h3>
           <div class="flex flex-wrap gap-2">
-            <UButton size="sm" variant="outline" @click="doAction(USER_ACTION.ban, { reason: 'admin' })">
+            <UButton size="sm" variant="outline" @click="dispatchAction(USER_ACTION.ban, { reason: 'admin' })">
               封禁
             </UButton>
-            <UButton size="sm" variant="outline" @click="doAction(USER_ACTION.unban)">
+            <UButton size="sm" variant="outline" @click="dispatchAction(USER_ACTION.unban)">
               解封
             </UButton>
-            <UButton size="sm" variant="outline" @click="doAction(USER_ACTION.kick)">
+            <UButton size="sm" variant="outline" @click="dispatchAction(USER_ACTION.kick)">
               踢出房间
             </UButton>
-            <UButton size="sm" variant="danger" @click="doAction(USER_ACTION.banIp)">
+            <UButton size="sm" variant="danger" @click="dispatchAction(USER_ACTION.banIp)">
               封禁 IP
             </UButton>
-            <UButton size="sm" variant="outline" @click="doAction(USER_ACTION.unbanIp)">
+            <UButton size="sm" variant="outline" @click="dispatchAction(USER_ACTION.unbanIp)">
               解封 IP
             </UButton>
           </div>
@@ -343,32 +368,13 @@ function auditRow(e: AuditEvent) {
           <h3 class="mb-2 text-sm font-medium text-foreground">
             IP 历史
           </h3>
-          <table class="w-full text-left text-sm">
-            <thead>
-              <tr class="border-b border-border text-xs uppercase text-muted">
-                <th class="px-2 py-1">
-                  IP
-                </th><th class="px-2 py-1">
-                  时间
-                </th><th class="px-2 py-1">
-                  房间
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(h, i) in security.data.value?.ip_history ?? []" :key="i" class="border-b border-border last:border-0">
-                <td class="px-2 py-1.5 font-mono">
-                  {{ h.ip }}
-                </td>
-                <td class="px-2 py-1.5 text-muted">
-                  {{ formatDateTime(h.seen_at) }}
-                </td>
-                <td class="px-2 py-1.5 text-muted">
-                  {{ h.room_uuid ?? '—' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <p v-if="!(security.data.value?.ip_history ?? []).length" class="text-sm text-muted">
+            无 IP 历史记录。
+          </p>
+          <pre v-else class="max-h-48 overflow-auto rounded bg-surface-secondary p-2 font-mono text-xs">{{ ipHistoryJson }}</pre>
+          <p class="mt-2 text-xs text-muted">
+            IP history / bans 为 PMP 动态 payload（§23 #5 / §13），结构随 PMP 演进，此处原样展示。
+          </p>
         </section>
       </AsyncState>
     </div>
@@ -383,5 +389,15 @@ function auditRow(e: AuditEvent) {
         </ul>
       </AsyncState>
     </div>
+
+    <ReauthModal
+      :open="reauth.open.value"
+      :busy="reauth.busy.value"
+      :error="reauth.error.value"
+      :password="reauth.password.value"
+      @update:password="v => reauth.password.value = v"
+      @confirm="reauth.confirm()"
+      @cancel="reauth.cancel()"
+    />
   </div>
 </template>

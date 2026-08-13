@@ -5,18 +5,21 @@ import { createGroup, deleteGroup, fetchGroups, setGroupMembers, setGroupPermiss
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
 import PermissionTree from '~/components/admin/PermissionTree.vue'
+import ReauthModal from '~/components/admin/ReauthModal.vue'
 import UBadge from '~/components/ui/UBadge.vue'
 import UButton from '~/components/ui/UButton.vue'
 import UInput from '~/components/ui/UInput.vue'
 import UModal from '~/components/ui/UModal.vue'
 import UTextarea from '~/components/ui/UTextarea.vue'
 import { useAsync } from '~/composables/useAsync'
+import { useReauth } from '~/composables/useReauth'
 import { usePermissionsStore } from '~/stores/permissions'
 import { ApiError } from '~/utils/api-error'
 
 definePageMeta({ permissions: ['group:view'] })
 
 const permStore = usePermissionsStore()
+const reauth = useReauth()
 
 const list = useAsync(() => fetchGroups({ pageNum: 100 }))
 
@@ -57,7 +60,7 @@ function parseMembers(text: string): string[] {
   return text.split(/[,，\n]/).map(s => s.trim()).filter(Boolean)
 }
 
-async function save() {
+async function save(reauthToken?: string) {
   if (!form.value.name.trim())
     return
   busy.value = true
@@ -65,16 +68,16 @@ async function save() {
   try {
     const memberIds = parseMembers(memberText.value)
     if (editing.value) {
-      await updateGroup(editing.value.id, { name: form.value.name, description: form.value.description, is_default: form.value.isDefault })
-      await setGroupPermissions(editing.value.id, selectedPerms.value)
+      await updateGroup(editing.value.id, { name: form.value.name, description: form.value.description, is_default: form.value.isDefault }, reauthToken)
+      await setGroupPermissions(editing.value.id, selectedPerms.value, reauthToken)
       if (memberIds.length)
-        await setGroupMembers(editing.value.id, memberIds)
+        await setGroupMembers(editing.value.id, memberIds, reauthToken)
     }
     else {
       const created = await createGroup({ name: form.value.name, description: form.value.description, is_default: form.value.isDefault })
-      await setGroupPermissions(created.id, selectedPerms.value)
+      await setGroupPermissions(created.id, selectedPerms.value, reauthToken)
       if (memberIds.length)
-        await setGroupMembers(created.id, memberIds)
+        await setGroupMembers(created.id, memberIds, reauthToken)
     }
     msg.value = '保存成功'
     closeModal()
@@ -86,6 +89,13 @@ async function save() {
   finally {
     busy.value = false
   }
+}
+
+// §23 #10: permission / member / default-group modification requires reauth.
+function submitSave() {
+  reauth.requireReauth(async (token) => {
+    await save(token)
+  })
 }
 
 /**
@@ -257,7 +267,7 @@ async function confirmDelete() {
           <UButton variant="ghost" @click="closeModal">
             取消
           </UButton>
-          <UButton variant="primary" :disabled="busy || !form.name.trim()" @click="save">
+          <UButton variant="primary" :disabled="busy || !form.name.trim()" @click="submitSave">
             保存
           </UButton>
         </div>
@@ -280,5 +290,15 @@ async function confirmDelete() {
         </div>
       </template>
     </UModal>
+
+    <ReauthModal
+      :open="reauth.open.value"
+      :busy="reauth.busy.value"
+      :error="reauth.error.value"
+      :password="reauth.password.value"
+      @update:password="v => reauth.password.value = v"
+      @confirm="reauth.confirm()"
+      @cancel="reauth.cancel()"
+    />
   </div>
 </template>

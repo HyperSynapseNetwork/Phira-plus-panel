@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { diffConfig, fetchConfigDescriptors, fetchConfigRaw, fetchConfigSnapshots, fetchConfigValues, rollbackConfig, saveConfig, validateConfig } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
+import ReauthModal from '~/components/admin/ReauthModal.vue'
 import UBadge from '~/components/ui/UBadge.vue'
 import UButton from '~/components/ui/UButton.vue'
 import UCard from '~/components/ui/UCard.vue'
@@ -11,10 +12,13 @@ import UModal from '~/components/ui/UModal.vue'
 import USwitch from '~/components/ui/USwitch.vue'
 import UTextarea from '~/components/ui/UTextarea.vue'
 import { useAsync } from '~/composables/useAsync'
+import { useReauth } from '~/composables/useReauth'
 import { ApiError } from '~/utils/api-error'
 import { formatDateTime } from '~/utils/format'
 
 definePageMeta({ permissions: ['config:view'] })
+
+const reauth = useReauth()
 
 const descriptors = useAsync(() => fetchConfigDescriptors())
 const values = useAsync(() => fetchConfigValues())
@@ -29,16 +33,16 @@ const diffModal = ref(false)
 const diffData = ref<Array<{ path: string, old: unknown, new: unknown }>>([])
 const rollbackTarget = ref<string | null>(null)
 
-// --- Secret status (§20.1): only configured / missing / replace, never echo. ---
+// --- Secret status (§20.1 / §23 #1): only configured / missing / replace, never echo. ---
 const replaceSecrets = ref(new Set<string>())
 const secretValue = reactive<Record<string, string>>({})
 
-const REDACTED_SENTINELS = ['******', '***', '__REDACTED__', '[redacted]', '••••••••']
-
+// §23 #1: PPB returns `[REDACTED]` (uppercase) for configured secrets. Any
+// non-empty value — including a redaction sentinel — means "configured".
 function secretStatus(path: string): 'configured' | 'missing' {
   const v = form[path]
-  const has = v !== undefined && v !== null && v !== '' && !REDACTED_SENTINELS.includes(String(v))
-  return has ? 'configured' : 'missing'
+  const empty = v === undefined || v === null || v === ''
+  return empty ? 'missing' : 'configured'
 }
 
 function toggleReplace(path: string) {
@@ -54,27 +58,37 @@ function toggleReplace(path: string) {
   replaceSecrets.value = s
 }
 
-/** Form values (§22 model A) overlaid with any replacement secret input. */
+onMounted(() => {
+  void snapshots.run()
+})
+
+// Original values, captured on load — used for dirty tracking (§23 #1: submit
+// only fields the user actually changed; never write `[REDACTED]` back).
+const original = reactive<Record<string, unknown>>({})
+
+// Populate the form from `GET /config/values` → `{version, values}`.
+watch(() => values.data.value, (v) => {
+  if (v?.values) {
+    for (const [k, val] of Object.entries(v.values)) {
+      form[k] = val
+      original[k] = val
+    }
+  }
+}, { immediate: true })
+
+/** Changed fields only (§23 #1: patch, not full-rebuild) + replacement secrets. */
 const formValues = computed<Record<string, unknown>>(() => {
-  const out: Record<string, unknown> = { ...form }
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(form)) {
+    if (!(k in original) || v !== original[k])
+      out[k] = v
+  }
   for (const p of replaceSecrets.value) {
     if (secretValue[p]?.length)
       out[p] = secretValue[p]
   }
   return out
 })
-
-onMounted(() => {
-  void snapshots.run()
-})
-
-// Populate the form from `GET /config/values` → `{version, values}`.
-watch(() => values.data.value, (v) => {
-  if (v?.values) {
-    for (const [k, val] of Object.entries(v.values))
-      form[k] = val
-  }
-}, { immediate: true })
 
 const groups = computed(() => descriptors.data.value?.groups ?? [])
 
@@ -133,13 +147,13 @@ function openRaw() {
   rawModal.value = true
 }
 
-async function doRollback() {
+async function doRollback(reauthToken?: string) {
   if (!rollbackTarget.value)
     return
   busy.value = true
   msg.value = ''
   try {
-    await rollbackConfig(rollbackTarget.value)
+    await rollbackConfig(rollbackTarget.value, reauthToken)
     msg.value = '已回滚快照'
     rollbackTarget.value = null
     void snapshots.run()
@@ -151,6 +165,13 @@ async function doRollback() {
   finally {
     busy.value = false
   }
+}
+
+// §23 #10: config rollback requires reauth.
+function submitRollback() {
+  reauth.requireReauth(async (token) => {
+    await doRollback(token)
+  })
 }
 </script>
 
@@ -347,11 +368,21 @@ async function doRollback() {
           <UButton variant="ghost" @click="rollbackTarget = null">
             取消
           </UButton>
-          <UButton variant="danger" :disabled="busy" @click="doRollback">
+          <UButton variant="danger" :disabled="busy" @click="submitRollback">
             回滚
           </UButton>
         </div>
       </template>
     </UModal>
+
+    <ReauthModal
+      :open="reauth.open.value"
+      :busy="reauth.busy.value"
+      :error="reauth.error.value"
+      :password="reauth.password.value"
+      @update:password="v => reauth.password.value = v"
+      @confirm="reauth.confirm()"
+      @cancel="reauth.cancel()"
+    />
   </div>
 </template>

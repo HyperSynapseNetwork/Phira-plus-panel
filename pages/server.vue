@@ -4,17 +4,21 @@ import { fetchServerStatus, runServerAction } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import KpiCard from '~/components/admin/KpiCard.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
+import ReauthModal from '~/components/admin/ReauthModal.vue'
 import UBadge from '~/components/ui/UBadge.vue'
 import UButton from '~/components/ui/UButton.vue'
 import UCard from '~/components/ui/UCard.vue'
 import UModal from '~/components/ui/UModal.vue'
 import USwitch from '~/components/ui/USwitch.vue'
 import { useAsync } from '~/composables/useAsync'
+import { useReauth } from '~/composables/useReauth'
 import { SERVER_ACTION } from '~/config/action-ids'
 import { ApiError } from '~/utils/api-error'
 import { formatDuration } from '~/utils/format'
 
 definePageMeta({ permissions: ['server:view'] })
+
+const reauth = useReauth()
 
 const status = useAsync(() => fetchServerStatus())
 const busy = ref(false)
@@ -32,11 +36,11 @@ const updateStages: Record<string, { label: string, tone: 'neutral' | 'warning' 
   error: { label: '更新失败', tone: 'danger' },
 }
 
-async function act(action: Parameters<typeof runServerAction>[0], args: Record<string, unknown> = {}) {
+async function act(action: Parameters<typeof runServerAction>[0], args: Record<string, unknown> = {}, reauthToken?: string) {
   msg.value = ''
   busy.value = true
   try {
-    await runServerAction(action, args)
+    await runServerAction(action, args, reauthToken)
     msg.value = `操作 ${action} 已提交`
     void status.run()
   }
@@ -48,9 +52,23 @@ async function act(action: Parameters<typeof runServerAction>[0], args: Record<s
   }
 }
 
+// §23 #10: shutdown / update.apply / update.force require reauth.
+const REAUTH_SERVER_ACTIONS = new Set<string>([SERVER_ACTION.shutdown, SERVER_ACTION.updateApply, SERVER_ACTION.updateForce])
+
+function dispatchServerAction(action: Parameters<typeof runServerAction>[0], args: Record<string, unknown> = {}) {
+  if (REAUTH_SERVER_ACTIONS.has(action)) {
+    reauth.requireReauth(async (token) => {
+      await act(action, args, token)
+    })
+  }
+  else {
+    void act(action, args)
+  }
+}
+
 function doShutdown() {
   confirmShutdown.value = false
-  void act(SERVER_ACTION.shutdown, { reason: 'admin' })
+  dispatchServerAction(SERVER_ACTION.shutdown, { reason: 'admin' })
 }
 </script>
 
@@ -156,7 +174,7 @@ function doShutdown() {
             <UButton size="sm" variant="outline" :disabled="busy || !['idle', 'error'].includes(updateState)" @click="act(SERVER_ACTION.updateCheck)">
               检查更新
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy || !['idle', 'error'].includes(updateState)" @click="act(SERVER_ACTION.updateApply)">
+            <UButton size="sm" variant="outline" :disabled="busy || !['idle', 'error'].includes(updateState)" @click="dispatchServerAction(SERVER_ACTION.updateApply)">
               {{ updateState === 'error' ? '重试应用' : '应用更新' }}
             </UButton>
             <UButton size="sm" variant="outline" :disabled="busy || updateState === 'idle' || updateState === 'error'" @click="act(SERVER_ACTION.updateCancel)">
@@ -196,5 +214,15 @@ function doShutdown() {
         </div>
       </template>
     </UModal>
+
+    <ReauthModal
+      :open="reauth.open.value"
+      :busy="reauth.busy.value"
+      :error="reauth.error.value"
+      :password="reauth.password.value"
+      @update:password="v => reauth.password.value = v"
+      @confirm="reauth.confirm()"
+      @cancel="reauth.cancel()"
+    />
   </div>
 </template>
