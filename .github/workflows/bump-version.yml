@@ -1,0 +1,67 @@
+name: Bump Version
+
+# Panel release versioning (Nuxt 3 SPA — no Rust). Manual dispatch bumps
+# package.json "version" (major/minor), commits, and tags vA.B.C. The actual
+# release is handled by release.yml on the v* tag push.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 升级类型 | major=A+1 | minor=B+1（默认）
+        type: choice
+        options:
+          - minor # → A.B+1.C
+          - major # → A+1.0.C
+        default: "minor"
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 计算新版本
+        id: version
+        run: |
+          FULL_VERSION=$(node -p "require('./package.json').version")
+          MAJOR=$(echo "$FULL_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$FULL_VERSION" | cut -d. -f2)
+
+          if [[ "${{ github.event.inputs.bump }}" == "major" ]]; then
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+          else
+            MINOR=$((MINOR + 1))
+          fi
+
+          # C = 自上一个版本标签（v*.*.*）以来的 commit 数（与 PMP 一致）。
+          LAST_TAG=$(git describe --tags --abbrev=0 --match 'v*.*.*' 2>/dev/null || true)
+          if [ -n "$LAST_TAG" ]; then
+            PATCH=$(git rev-list --count "$LAST_TAG"..HEAD)
+          else
+            PATCH=$(git rev-list --count HEAD)
+          fi
+
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: 更新 package.json 版本号
+        run: |
+          node -e "const fs=require('fs');const p='package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.version='${{ steps.version.outputs.version }}';fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')"
+
+      - name: 提交并打标签
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add package.json
+          git commit -m "chore: bump version to $TAG"
+          git tag -a "$TAG" -m "Version $TAG"
+          git push --follow-tags

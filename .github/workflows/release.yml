@@ -1,0 +1,129 @@
+name: Release
+
+# Panel release (Nuxt 3 SPA — no Rust). `v*` tag → quality gate (lint +
+# contract + vue-tsc + test + build + noindex) → package .output/public into a
+# tar.gz → GitHub Release with SHA256SUMS + build provenance. No cargo/SBOM.
+on:
+  workflow_dispatch:
+    inputs:
+      description:
+        description: 版本说明（可选）
+        type: string
+        default: ""
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          FULL_VERSION=$(node -p "require('./package.json').version")
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && "${GITHUB_REF_NAME}" != "v$FULL_VERSION" ]]; then
+            echo "release tag ${GITHUB_REF_NAME} does not match package version v$FULL_VERSION" >&2
+            exit 1
+          fi
+          echo "tag=v$FULL_VERSION" >> "$GITHUB_OUTPUT"
+          echo "version=$FULL_VERSION" >> "$GITHUB_OUTPUT"
+
+  quality-gate:
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Contract consistency
+        run: node scripts/check-contract-consistency.mjs
+
+      - name: Typecheck (vue-tsc)
+        run: pnpm vue-tsc
+
+      - name: Unit / component tests
+        run: pnpm test
+
+      - name: Nuxt SPA build
+        run: pnpm build
+
+      - name: Noindex regression check
+        run: pnpm test:noindex
+
+      - name: Package static output (.output/public)
+        run: |
+          set -euo pipefail
+          ARTIFACT="phira-plus-panel-v${{ needs.version.outputs.version }}.tar.gz"
+          tar -czf "$ARTIFACT" -C .output/public .
+          sha256sum "$ARTIFACT" > SHA256SUMS
+
+      - name: Generate provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: phira-plus-panel-v${{ needs.version.outputs.version }}.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phira-plus-panel-dist
+          path: |
+            phira-plus-panel-v${{ needs.version.outputs.version }}.tar.gz
+            SHA256SUMS
+          if-no-files-found: error
+
+  release:
+    needs: [version, quality-gate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: phira-plus-panel-dist
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: v${{ needs.version.outputs.version }}
+          body: ${{ github.event.inputs.description }}
+          files: |
+            phira-plus-panel-v${{ needs.version.outputs.version }}.tar.gz
+            SHA256SUMS
+          prerelease: false
