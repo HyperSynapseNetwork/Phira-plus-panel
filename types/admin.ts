@@ -6,7 +6,7 @@
  */
 
 import type { Paginated } from './api'
-import type { GroupRef, PmpStatus, ServerStatusResponse, TranslatedError, components } from './generated'
+import type { components, GroupRef, PmpStatus, ServerStatusResponse, TranslatedError } from './generated'
 import type { RoomActionId, ServerActionId } from '~/config/action-ids'
 
 // Canonical wire types generated from the PPB OpenAPI contract

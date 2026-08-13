@@ -12,7 +12,7 @@ on:
         options:
           - minor # → A.B+1.C
           - major # → A+1.0.C
-        default: "minor"
+        default: minor
 
 permissions:
   contents: write

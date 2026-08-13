@@ -9,7 +9,7 @@ on:
       description:
         description: 版本说明（可选）
         type: string
-        default: ""
+        default: ''
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'

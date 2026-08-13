@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Job } from '~/types/admin'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import {
   cancelJob,
@@ -26,7 +27,6 @@ import { SERVER_ACTION, UPDATE_JOB } from '~/config/action-ids'
 import { useAuthStore } from '~/stores/auth'
 import { ApiError } from '~/utils/api-error'
 import { formatDuration, formatNumber } from '~/utils/format'
-import type { Job } from '~/types/admin'
 
 definePageMeta({ permissions: ['server:view'] })
 
@@ -261,24 +261,44 @@ const runtimeEntries = computed(() => {
         <UCard title="服务器统计" subtitle="PMP typed stats（§23 #6）">
           <dl class="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <dt class="text-xs text-muted">会话</dt>
-              <dd class="text-foreground">{{ formatNumber(stats.data.value?.active_sessions) }}</dd>
+              <dt class="text-xs text-muted">
+                会话
+              </dt>
+              <dd class="text-foreground">
+                {{ formatNumber(stats.data.value?.active_sessions) }}
+              </dd>
             </div>
             <div>
-              <dt class="text-xs text-muted">已加载插件</dt>
-              <dd class="text-foreground">{{ formatNumber(stats.data.value?.loaded_plugins) }}</dd>
+              <dt class="text-xs text-muted">
+                已加载插件
+              </dt>
+              <dd class="text-foreground">
+                {{ formatNumber(stats.data.value?.loaded_plugins) }}
+              </dd>
             </div>
             <div>
-              <dt class="text-xs text-muted">运行时长</dt>
-              <dd class="text-foreground">{{ formatDuration(stats.data.value?.uptime_secs) }}</dd>
+              <dt class="text-xs text-muted">
+                运行时长
+              </dt>
+              <dd class="text-foreground">
+                {{ formatDuration(stats.data.value?.uptime_secs) }}
+              </dd>
             </div>
             <div>
-              <dt class="text-xs text-muted">端口</dt>
-              <dd class="text-foreground">{{ stats.data.value?.port ?? '—' }} / {{ stats.data.value?.http_port ?? '—' }}</dd>
+              <dt class="text-xs text-muted">
+                端口
+              </dt>
+              <dd class="text-foreground">
+                {{ stats.data.value?.port ?? '—' }} / {{ stats.data.value?.http_port ?? '—' }}
+              </dd>
             </div>
             <div class="col-span-2">
-              <dt class="text-xs text-muted">服务器名</dt>
-              <dd class="text-foreground">{{ stats.data.value?.server_name || '—' }}</dd>
+              <dt class="text-xs text-muted">
+                服务器名
+              </dt>
+              <dd class="text-foreground">
+                {{ stats.data.value?.server_name || '—' }}
+              </dd>
             </div>
           </dl>
         </UCard>
@@ -288,8 +308,12 @@ const runtimeEntries = computed(() => {
         <UCard title="运行时诊断" subtitle="PMP runtime.status（动态 JSON，P-90）">
           <dl v-if="runtimeEntries.length" class="grid grid-cols-2 gap-3 text-sm">
             <div v-for="e in runtimeEntries" :key="e.key">
-              <dt class="text-xs text-muted">{{ e.key }}</dt>
-              <dd class="break-all text-foreground">{{ e.value }}</dd>
+              <dt class="text-xs text-muted">
+                {{ e.key }}
+              </dt>
+              <dd class="break-all text-foreground">
+                {{ e.value }}
+              </dd>
             </div>
           </dl>
         </UCard>
