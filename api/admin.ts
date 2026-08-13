@@ -48,6 +48,11 @@ import type { Paginated } from '~/types/api'
  */
 import { useApi } from '~/composables/useApi'
 
+/** §23 #10 sensitive-action policy: elevated writes carry `X-Reauth-Token`. */
+function reauthHeaders(token?: string): Record<string, string> | undefined {
+  return token ? { 'X-Reauth-Token': token } : undefined
+}
+
 // --- Permissions -----------------------------------------------------------
 export function fetchPermissionManifest(): Promise<PermissionManifestEntry[]> {
   return useApi().get('/admin/permissions/manifest')
@@ -63,17 +68,17 @@ export function fetchGroup(id: string): Promise<Group> {
 export function createGroup(payload: GroupPayload): Promise<Group> {
   return useApi().post('/admin/groups', payload)
 }
-export function updateGroup(id: string, payload: Partial<GroupPayload> & { permissions?: string[] }): Promise<Group> {
-  return useApi().patch(`/admin/groups/${id}`, payload)
+export function updateGroup(id: string, payload: Partial<GroupPayload> & { permissions?: string[] }, reauthToken?: string): Promise<Group> {
+  return useApi().fetch(`/admin/groups/${id}`, { method: 'PATCH', body: payload, headers: reauthHeaders(reauthToken) })
 }
 export function deleteGroup(id: string): Promise<{ ok: true }> {
   return useApi().delete(`/admin/groups/${id}`)
 }
-export function setGroupMembers(id: string, userIds: string[]): Promise<Group> {
-  return useApi().put(`/admin/groups/${id}/members`, { user_ids: userIds })
+export function setGroupMembers(id: string, userIds: string[], reauthToken?: string): Promise<Group> {
+  return useApi().fetch(`/admin/groups/${id}/members`, { method: 'PUT', body: { user_ids: userIds }, headers: reauthHeaders(reauthToken) })
 }
-export function setGroupPermissions(id: string, permissions: string[]): Promise<Group> {
-  return useApi().put(`/admin/groups/${id}/permissions`, { permissions })
+export function setGroupPermissions(id: string, permissions: string[], reauthToken?: string): Promise<Group> {
+  return useApi().fetch(`/admin/groups/${id}/permissions`, { method: 'PUT', body: { permissions }, headers: reauthHeaders(reauthToken) })
 }
 
 // --- Users (PPB + PMP unified, §18.4) --------------------------------------
@@ -87,7 +92,7 @@ export function fetchUser(phiraId: number): Promise<UserDetail> {
 export function fetchUserMultiplayer(phiraId: number): Promise<UserMultiplayer> {
   return useApi().get(`/admin/users/${phiraId}/multiplayer`)
 }
-export function fetchUserSessions(phiraId: number): Promise<UserSession[]> {
+export function fetchUserSessions(phiraId: number): Promise<{ items: UserSession[] }> {
   return useApi().get(`/admin/users/${phiraId}/sessions`)
 }
 export function fetchUserSecurity(phiraId: number): Promise<UserSecurity> {
@@ -96,8 +101,9 @@ export function fetchUserSecurity(phiraId: number): Promise<UserSecurity> {
 export function fetchUserAudit(phiraId: number, params?: Record<string, unknown>): Promise<Paginated<AuditEvent>> {
   return useApi().get(`/admin/users/${phiraId}/audit`, params)
 }
-export function runUserAction(phiraId: number, action: string, args: Record<string, unknown> = {}): Promise<ActionExecuteResult> {
-  return useApi().post(`/admin/users/${phiraId}/actions`, { action, args })
+/** Sensitive user actions (ban / IP-ban, §23 #10) require reauth. */
+export function runUserAction(phiraId: number, action: string, args: Record<string, unknown> = {}, reauthToken?: string): Promise<ActionExecuteResult> {
+  return useApi().fetch(`/admin/users/${phiraId}/actions`, { method: 'POST', body: { action, args }, headers: reauthHeaders(reauthToken) })
 }
 
 // --- Rooms (list/detail/actions/batch, §18.3) ------------------------------
@@ -131,8 +137,8 @@ export function runRoomBatchAction(
 export function fetchServerStatus(): Promise<ServerStatus> {
   return useApi().get('/admin/server/status')
 }
-export function runServerAction(action: ServerAction, args: Record<string, unknown> = {}): Promise<ActionExecuteResult> {
-  return useApi().post('/admin/server/actions', { action, args })
+export function runServerAction(action: ServerAction, args: Record<string, unknown> = {}, reauthToken?: string): Promise<ActionExecuteResult> {
+  return useApi().fetch('/admin/server/actions', { method: 'POST', body: { action, args }, headers: reauthHeaders(reauthToken) })
 }
 
 // --- Config (Form Descriptor model A + snapshot/rollback, §20/§22) ---------
@@ -155,8 +161,8 @@ export function saveConfig(values: ConfigValue): Promise<{ ok: boolean, snapshot
 export function fetchConfigSnapshots(): Promise<{ items: ConfigSnapshot[] }> {
   return useApi().get('/admin/config/snapshots')
 }
-export function rollbackConfig(snapshotId: string): Promise<{ ok: true }> {
-  return useApi().post('/admin/config/rollback', { snapshot_id: snapshotId })
+export function rollbackConfig(snapshotId: string, reauthToken?: string): Promise<{ ok: true }> {
+  return useApi().fetch('/admin/config/rollback', { method: 'POST', body: { snapshot_id: snapshotId }, headers: reauthHeaders(reauthToken) })
 }
 /** Raw YAML view (read-only advanced entry, §20.3). */
 export function fetchConfigRaw(): Promise<string> {
@@ -178,8 +184,9 @@ export function callPlugin(id: string, method?: string, args: Record<string, unk
 export function fetchLogs(params: LogFilter & { page?: number, pageNum?: number } = {}): Promise<Paginated<LogEntry>> {
   return useApi().get('/admin/logs', params)
 }
-export function translateLog(input: { error_code?: string, message?: string }): Promise<LogTranslation> {
-  return useApi().post('/admin/logs/translate', input)
+/** §23 P-91: request `{code}`; response `{code, translated: {...} | null}`. */
+export function translateLog(code: string): Promise<LogTranslation> {
+  return useApi().post('/admin/logs/translate', { code })
 }
 
 // --- Console / Commands (§18.10) ------------------------------------------

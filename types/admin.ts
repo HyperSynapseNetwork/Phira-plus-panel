@@ -6,6 +6,7 @@
  */
 
 import type { Paginated } from './api'
+import type { GroupRef, TranslatedError } from './generated'
 import type { RoomActionId, ServerActionId } from '~/config/action-ids'
 
 // Canonical wire types generated from the PPB OpenAPI contract
@@ -15,6 +16,7 @@ export type {
   ChatSendBody,
   ErrorBody,
   ErrorEnvelope,
+  GroupRef,
   MeResponse,
   PaginationResponse,
   PhiraLoginRequest,
@@ -24,6 +26,9 @@ export type {
   RoomActionBody2,
   RoomActionRequest,
   SendBody,
+  TranslatedError,
+  TranslateParams,
+  TranslateResponse,
 } from './generated'
 
 // ---------------------------------------------------------------------------
@@ -78,40 +83,44 @@ export interface AdminUser {
   updated_at: string
 }
 
-/** `GET /admin/users/{phira_id}` → `{account, groups, player}` (§22). */
+/** `GET /admin/users/{phira_id}` → `{account, groups, player}` (§23 #3). */
 export interface UserDetail {
   account: AdminUser
-  groups: string[]
+  /** §23 #3: object array `[{id, name}]`, not string[]. */
+  groups: GroupRef[]
   /** Best-effort PMP player info (dynamic payload; null when PMP offline). */
   player?: unknown
 }
 
+/** `GET /admin/users/{phira_id}/multiplayer` (§23 #5, strong-typed). */
 export interface UserMultiplayer {
-  current_room?: { room_uuid: string, name: string } | null
-  visit_history_count?: number
-  playtime_secs?: number
-  rounds_count?: number
-  replay_count?: number
-  ban_state?: 'none' | 'banned' | string
+  phira_id: number
+  online: boolean
+  ban_state: boolean
+  current_room?: string | null
+  playtime_secs?: number | null
+  replay_count?: number | null
+  rounds_played?: number | null
 }
 
+/** `GET /admin/users/{phira_id}/sessions` item (§23 #5, SessionItem). */
 export interface UserSession {
   id: string
-  client_type: 'ppf' | 'panel' | 'windows' | 'android' | string
+  client_type: string
   created_at: string
-  expires_at?: string
-  revoked_at?: string
-  last_seen_at?: string
-  device_name?: string
-  ip?: string
+  device_name: string
+  ip: string
+  revoked_at?: string | null
 }
 
+/** `GET /admin/users/{phira_id}/security` (§23 #5, strong-typed). */
 export interface UserSecurity {
-  ban_state?: 'none' | 'banned' | string
-  banned_at?: string
-  ban_reason?: string
-  ip_history?: Array<{ ip: string, seen_at: string, room_uuid?: string }>
-  ip_bans?: Array<{ ip: string, banned_at: string, reason?: string }>
+  phira_id: number
+  ban_state: boolean
+  ban_reason?: string | null
+  banned_at?: unknown
+  ip_bans?: unknown
+  ip_history: unknown[]
 }
 
 export interface UserAuditSummary {
@@ -330,12 +339,10 @@ export interface LogFilter {
   log_id?: string
 }
 
+/** `POST /admin/logs/translate` response (§23 P-91): `{code, translated|null}`. */
 export interface LogTranslation {
-  title: string
-  explanation: string
-  module?: string
-  severity?: string
-  suggestion?: string
+  code: string
+  translated: TranslatedError | null
 }
 
 // ---------------------------------------------------------------------------
