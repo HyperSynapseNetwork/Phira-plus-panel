@@ -151,25 +151,9 @@ export function fetchServerRuntime(): Promise<ServerRuntime> {
 export function runServerAction(action: ServerAction, args: Record<string, unknown> = {}, reauthToken?: string): Promise<ActionExecuteResult> {
   return useApi().fetch('/admin/server/actions', { method: 'POST', body: { action, args }, headers: reauthHeaders(reauthToken) })
 }
-/**
- * Read server gate state. Connection gate uses `server.connections` with no
- * `enabled` (backend read path, §23 #2) and parses the CLI output best-effort;
- * room-creation has no read endpoint yet (PPB gap) → always `null`.
- */
-export async function fetchServerGates(): Promise<ServerGates> {
-  let connections: boolean | null = null
-  try {
-    const res = await runServerAction('server.connections') as unknown as { output?: unknown }
-    const text = Array.isArray(res.output) ? res.output.map(String).join(' ') : String(res.output ?? '')
-    if (/已关闭|已禁用|\boff\b|disabled/i.test(text))
-      connections = false
-    else if (/已开启|已启用|\bon\b|enabled/i.test(text))
-      connections = true
-  }
-  catch {
-    connections = null
-  }
-  return { connections, room_creation: null }
+/** `GET /admin/server/gates` → typed `{connections, room_creation}` (§23 #2). */
+export function fetchServerGates(): Promise<ServerGates> {
+  return useApi().get('/admin/server/gates')
 }
 
 // --- Config (Form Descriptor model A + snapshot/rollback, §20/§22) ---------

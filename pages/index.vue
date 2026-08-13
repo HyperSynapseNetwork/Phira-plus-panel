@@ -14,7 +14,7 @@ definePageMeta({ permissions: ['dashboard:view'] })
 const server = useAsync(() => fetchServerStatus())
 const stats = useAsync(() => fetchServerStats())
 const runtime = useAsync(() => fetchServerRuntime())
-const logs = useAsync(() => fetchLogs({ level: 'warn,error', pageNum: 200 }))
+const logs = useAsync(() => fetchLogs({ level: 'warn,error', pageNum: 100 }))
 const jobs = useAsync(() => fetchJobs({ pageNum: 50 }))
 
 interface AggregatedAlert {

@@ -34,7 +34,7 @@ const list = useAsync(() => fetchLogs({
   service: service.value || undefined,
   level: level.value || undefined,
   search: search.value || undefined,
-  pageNum: 200,
+  pageNum: 100,
 }))
 
 watch([service, level, search], () => {
@@ -120,7 +120,7 @@ function prependLog(e: LogEntry) {
     items: [e, ...items].slice(0, 500),
     total: (list.data.value?.total ?? items.length) + 1,
     page: 1,
-    pageNum: 200,
+    pageNum: 100,
   }
 }
 

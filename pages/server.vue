@@ -328,24 +328,18 @@ const runtimeEntries = computed(() => {
               <span class="text-sm text-foreground">连接门控</span>
               <USwitch
                 :model-value="gates.data.value?.connections ?? false"
-                :disabled="busy || gates.data.value?.connections == null"
+                :disabled="busy"
                 @update:model-value="v => act(SERVER_ACTION.setConnections, { enabled: v })"
               />
             </div>
-            <p v-if="gates.data.value?.connections == null" class="text-xs text-muted">
-              读取状态不可用（PPB 未返回门控状态）——开关仅用于下发命令。
-            </p>
             <div class="flex items-center justify-between">
               <span class="text-sm text-foreground">房间创建</span>
               <USwitch
                 :model-value="gates.data.value?.room_creation ?? false"
-                :disabled="busy || gates.data.value?.room_creation == null"
+                :disabled="busy"
                 @update:model-value="v => act(SERVER_ACTION.setRoomCreation, { enabled: v })"
               />
             </div>
-            <p v-if="gates.data.value?.room_creation == null" class="text-xs text-muted">
-              房间创建门控读取端点尚未实现（PPB 待补）——开关仅用于下发命令。
-            </p>
           </div>
         </UCard>
       </AsyncState>

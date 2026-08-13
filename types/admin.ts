@@ -204,14 +204,10 @@ export type ServerStatsResponse = components['schemas']['ServerStatsResponse']
 /** `GET /admin/server/runtime` → dynamic PMP `runtime.status` payload (P-90). */
 export type ServerRuntime = Record<string, unknown>
 
-/**
- * Server gate read state. Connection gate is readable via `server.connections`
- * (no `enabled` = read, §23 #2); room-creation gate has no typed read endpoint
- * yet (PPB gap) so it stays `null` until PPB adds one.
- */
+/** `GET /admin/server/gates` → `{connections, room_creation}` (§23 #2 real gate read). */
 export interface ServerGates {
-  connections: boolean | null
-  room_creation: boolean | null
+  connections: boolean
+  room_creation: boolean
 }
 
 export type ServerAction = ServerActionId
