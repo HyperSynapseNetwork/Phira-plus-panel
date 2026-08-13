@@ -8,6 +8,15 @@ export default defineNuxtConfig({
    */
   ssr: false,
 
+  // 纯 SPA：显式关闭 Nitro 预渲染，避免生成 _payload.json（否则会与客户端
+  // 状态不一致，触发 "Hydration completed but contains mismatches"）。
+  nitro: {
+    prerender: {
+      crawlLinks: false,
+      routes: [],
+    },
+  },
+
   compatibilityDate: '2026-08-12',
 
   devtools: { enabled: false },
