@@ -57,6 +57,12 @@ const updateJob = computed<Job | undefined>(() =>
 const updateActive = computed(() =>
   updateJob.value != null && (updateJob.value.state === 'queued' || updateJob.value.state === 'running'),
 )
+/**
+ * Cancel is only meaningful while the job is still `queued` (before dispatch to
+ * PMP). Once dispatched (`running` / `executing_pmp_update`) or finished the
+ * backend cancel is a no-op, so the button is hidden instead of misleading.
+ */
+const updateCancellable = computed(() => updateJob.value?.state === 'queued')
 const updateTone = computed<'neutral' | 'success' | 'warning' | 'danger'>(() => {
   const s = updateJob.value?.state
   return s === 'succeeded' ? 'success' : s === 'failed' ? 'danger' : s === 'cancelled' ? 'neutral' : 'warning'
@@ -370,7 +376,13 @@ const runtimeEntries = computed(() => {
             <UButton size="sm" variant="outline" :disabled="busy || updateActive" @click="dispatchUpdateApply">
               应用更新
             </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy || !updateActive" @click="doCancelUpdate">
+            <UButton
+              v-if="updateCancellable"
+              size="sm"
+              variant="outline"
+              :disabled="busy"
+              @click="doCancelUpdate"
+            >
               取消
             </UButton>
             <UButton
