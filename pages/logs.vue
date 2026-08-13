@@ -64,9 +64,10 @@ function stopLive() {
 }
 
 /**
- * Live Logs via SSE (`GET /api/v1/admin/events`, contract §1/§3). EventSource
- * auto-reconnects and sends Last-Event-ID. If SSE is unavailable the client
- * falls back to 3s polling so live mode never silently dies.
+ * Live Logs via SSE (`GET /api/v1/admin/logs/stream`). Each event `data` is a
+ * structured `LogEntry` (same schema as the history endpoint). EventSource
+ * auto-reconnects; if SSE is unavailable the client falls back to 3s polling
+ * so live mode never silently dies.
  */
 function toggleLive() {
   live.value = !live.value
@@ -78,18 +79,10 @@ function toggleLive() {
   const config = useRuntimeConfig()
   const baseURL = `${config.public.apiBase}/api/v1`
   try {
-    es = new EventSource(`${baseURL}/admin/events`, { withCredentials: true })
-    es.onmessage = (ev) => {
-      try {
-        const parsed = JSON.parse(ev.data) as unknown
-        const entry = extractLogEntry(parsed)
-        if (entry)
-          prependLog(entry)
-      }
-      catch {
-        // non-JSON / unknown envelope — ignore
-      }
-    }
+    es = new EventSource(`${baseURL}/admin/logs/stream`, { withCredentials: true })
+    const handle = (ev: Event) => consumeLogEvent((ev as MessageEvent).data)
+    es.onmessage = handle
+    es.addEventListener('log', handle)
     es.onerror = () => startPollFallback()
   }
   catch {
@@ -103,13 +96,16 @@ function startPollFallback() {
   pollTimer = setInterval(() => void list.run(), 3000)
 }
 
-/** Pull a LogEntry out of the §3 SSE envelope (`data` may be the entry). */
-function extractLogEntry(ev: unknown): LogEntry | null {
-  const envelope = ev as { type?: string, data?: unknown }
-  const data = envelope?.data as Partial<LogEntry> | undefined
-  if (data && typeof data === 'object' && 'log_id' in data && 'message' in data && 'timestamp' in data)
-    return data as LogEntry
-  return null
+/** Parse one SSE frame into a `LogEntry` (target contract: `data` is the entry). */
+function consumeLogEvent(raw: unknown): void {
+  try {
+    const entry = JSON.parse(String(raw)) as LogEntry
+    if (entry && typeof entry === 'object' && 'log_id' in entry && 'timestamp' in entry && 'message' in entry)
+      prependLog(entry)
+  }
+  catch {
+    // non-JSON / malformed frame — ignore
+  }
 }
 
 function prependLog(e: LogEntry) {
