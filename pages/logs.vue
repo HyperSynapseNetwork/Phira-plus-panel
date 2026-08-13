@@ -154,15 +154,18 @@ const logs = computed<LogEntry[]>(() => list.data.value?.items ?? [])
 
 async function openEntry(e: LogEntry) {
   selected.value = e
-  translation.value = localTranslate({ error_code: e.error_code, message: e.message })
+  translation.value = localTranslate({ code: e.error_code, message: e.message })
   try {
-    const t = await translateLog({ error_code: e.error_code, message: e.message })
-    translation.value = {
-      title: t.title,
-      explanation: t.explanation,
-      module: t.module,
-      severity: t.severity,
-      suggestion: t.suggestion,
+    // §23 P-91: request `{code}`, consume `{code, translated: {...} | null}`.
+    const t = await translateLog(e.error_code ?? '')
+    if (t.translated) {
+      translation.value = {
+        title: t.translated.title,
+        explanation: t.translated.explanation,
+        module: t.translated.module,
+        severity: t.translated.severity,
+        suggestion: t.translated.suggestion ?? undefined,
+      }
     }
   }
   catch {

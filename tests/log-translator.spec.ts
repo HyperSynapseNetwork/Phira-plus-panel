@@ -3,7 +3,7 @@ import { localTranslate } from '~/utils/log-translator'
 
 describe('log translator (§19.2, rules-based)', () => {
   it('resolves known error codes', () => {
-    const t = localTranslate({ error_code: 'PMP_OPENUDS_TIMEOUT' })
+    const t = localTranslate({ code: 'PMP_OPENUDS_TIMEOUT' })
     expect(t?.title).toContain('超时')
     expect(t?.module).toBe('OpenUDS')
   })

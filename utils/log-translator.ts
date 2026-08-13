@@ -59,9 +59,10 @@ const REGISTRY: Record<string, LocalLogTranslation> = {
   },
 }
 
-export function localTranslate(input: { error_code?: string, message?: string }): LocalLogTranslation | null {
-  if (input.error_code && REGISTRY[input.error_code])
-    return REGISTRY[input.error_code]
+/** §23 P-91: key by `code` (was `error_code`); `code` is the error code. */
+export function localTranslate(input: { code?: string, message?: string }): LocalLogTranslation | null {
+  if (input.code && REGISTRY[input.code])
+    return REGISTRY[input.code]
   if (input.message) {
     const m = input.message.toLowerCase()
     if (m.includes('timeout'))
