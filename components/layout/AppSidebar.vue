@@ -49,7 +49,7 @@ const sections = computed(() =>
             <NuxtLink
               :to="item.to"
               class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm"
-              :class="isActive(item) ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-surface-secondary'"
+              :class="isActive(item) ? 'bg-accent-soft text-accent' : 'text-foreground hover:bg-surface-secondary'"
             >
               <span :class="collapsed ? 'mx-auto' : ''">{{ item.label }}</span>
             </NuxtLink>

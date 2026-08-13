@@ -60,7 +60,7 @@ function focusWindow(id: number) {
 </script>
 
 <template>
-  <header class="flex h-12 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
+  <header class="flex h-12 shrink-0 items-center justify-between border-b border-border bg-[var(--pp-material-regular)] px-4 backdrop-blur-md backdrop-saturate-150">
     <div class="flex items-center gap-2 text-sm text-muted">
       运营控制台
       <span v-if="dwEnabled" class="text-[10px] text-warning">实验</span>
