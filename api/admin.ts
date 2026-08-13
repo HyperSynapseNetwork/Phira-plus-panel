@@ -50,6 +50,7 @@ import type { Paginated } from '~/types/api'
  * the resulting ApiError gracefully (no fabricated data).
  */
 import { useApi } from '~/composables/useApi'
+import { normalizeRoom, normalizeRoomListResponse } from '~/utils/rooms'
 
 /** §23 #10 sensitive-action policy: elevated writes carry `X-Reauth-Token`. */
 function reauthHeaders(token?: string): Record<string, string> | undefined {
@@ -110,15 +111,18 @@ export function runUserAction(phiraId: number, action: string, args: Record<stri
 }
 
 // --- Rooms (list/detail/actions/batch, §18.3) ------------------------------
-export function fetchRooms(params?: Record<string, unknown>): Promise<Paginated<AdminRoom>> {
-  return useApi().get('/admin/rooms', params)
+export async function fetchRooms(params?: Record<string, unknown>): Promise<Paginated<AdminRoom>> {
+  const raw: unknown = await useApi().get('/admin/rooms', params)
+  return normalizeRoomListResponse(raw, params)
 }
 /** Create a room (§18.3 Actions create / §17 `POST /rooms`). */
-export function createRoom(payload: { name: string, max_users?: number }): Promise<AdminRoom> {
-  return useApi().post('/admin/rooms', payload)
+export async function createRoom(payload: { name: string, max_users?: number }): Promise<AdminRoom> {
+  const raw: unknown = await useApi().post('/admin/rooms', payload)
+  return normalizeRoom(raw)
 }
-export function fetchRoom(uuid: string): Promise<AdminRoom> {
-  return useApi().get(`/admin/rooms/${uuid}`)
+export async function fetchRoom(uuid: string): Promise<AdminRoom> {
+  const raw: unknown = await useApi().get(`/admin/rooms/${uuid}`)
+  return normalizeRoom(raw)
 }
 export function runRoomAction(uuid: string, action: RoomActionName, args: RoomActionArgs = {}): Promise<RoomActionResult> {
   return useApi().post(`/admin/rooms/${uuid}/actions`, { action, args })
