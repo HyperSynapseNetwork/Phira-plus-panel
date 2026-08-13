@@ -430,7 +430,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET /api/v1/admin/config/raw — raw PMP config YAML. */
+        /**
+         * GET /api/v1/admin/config/raw — raw PMP config YAML (plain text).
+         * @description Contract: the Panel consumer reads the raw YAML as a `text/plain` string
+         *     (`fetchConfigRaw(): Promise<string>`), not a JSON envelope.
+         */
         get: operations["admin_config_raw_get"];
         put?: never;
         post?: never;
@@ -663,7 +667,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET /api/v1/admin/jobs — recent jobs. */
+        /** GET /api/v1/admin/jobs — recent jobs (paginated). */
         get: operations["admin_jobs_get"];
         put?: never;
         /** POST /api/v1/admin/jobs — start a new job. */
@@ -766,7 +770,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET /api/v1/admin/logs — recent PMP log history. */
+        /** GET /api/v1/admin/logs — recent PMP log history, structured + paginated. */
         get: operations["admin_logs_get"];
         put?: never;
         post?: never;
@@ -1132,6 +1136,23 @@ export interface paths {
         put?: never;
         /** POST /api/v1/admin/server/config-reload — hot reload PMP config. */
         post: operations["admin_server_config_reload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/server/gates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /api/v1/admin/server/gates — read connection-acceptance + room-creation gates. */
+        get: operations["admin_server_gates_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2429,10 +2450,6 @@ export interface components {
             key: string;
             label: string;
         };
-        /** @description Typed raw-config response `{ content }`. */
-        ConfigRawResponse: {
-            content: string;
-        };
         /** @description Typed rollback response `{ ok, restored, health }`. */
         ConfigRollbackResponse: {
             health: unknown;
@@ -2498,6 +2515,8 @@ export interface components {
         };
         CreateGroupBody: {
             description?: string;
+            /** @description Create as the (single) default group — clears any existing default (§23 #4). */
+            is_default?: boolean | null;
             name: string;
         };
         CreateJobBody: {
@@ -2604,13 +2623,53 @@ export interface components {
             state: string;
             type: string;
         };
+        /** @description Paginated job list response (§22 `{items, total, page, pageNum}`). */
+        JobListResponse: {
+            items: components["schemas"]["Job"][];
+            /** Format: int64 */
+            page: number;
+            /** Format: int64 */
+            pageNum: number;
+            /** Format: int64 */
+            total: number;
+        };
         JoinIntentBody: {
             room_id: string;
             /** Format: int64 */
             ttl_secs?: number | null;
         };
+        /**
+         * @description Structured log entry (contract §23 #3 / Panel §18.11).
+         *
+         *     PMP is the logs source of truth (§13); PPB does not hard-code PMP's internal
+         *     payload — each raw line is best-effort structured into this stable shape.
+         *     `service` is `"pmp"` for entries sourced from `logs.history`.
+         */
+        LogEntry: {
+            command_id?: string | null;
+            error_code?: string | null;
+            event?: string | null;
+            level: string;
+            log_id: string;
+            message: string;
+            request_id?: string | null;
+            room_uuid?: string | null;
+            service: string;
+            timestamp: string;
+            user_id?: string | null;
+        };
         LogInputBody: {
             command: string;
+        };
+        /** @description Paginated structured log list response (§22 `{items, total, page, pageNum}`). */
+        LogListResponse: {
+            items: components["schemas"]["LogEntry"][];
+            /** Format: int64 */
+            page: number;
+            /** Format: int64 */
+            pageNum: number;
+            /** Format: int64 */
+            total: number;
         };
         /** @description `GET /api/v1/me` session-probe response (S-4). */
         MeResponse: {
@@ -2623,6 +2682,20 @@ export interface components {
             session: unknown;
             user?: unknown;
         };
+        /** @description One delivery row `{event_id, type, created_at, delivered}`. */
+        NotificationDeliveryItem: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int64 */
+            delivered: number;
+            /** Format: uuid */
+            event_id: string;
+            type: string;
+        };
+        /** @description Typed `GET /admin/notifications/delivery` response `{items}`. */
+        NotificationDeliveryResponse: {
+            items: components["schemas"]["NotificationDeliveryItem"][];
+        };
         /** @description Inbox response (§22 `{items, total, page, pageNum, unread}`). */
         NotificationInboxResponse: {
             items: components["schemas"]["AppNotificationWire"][];
@@ -2634,6 +2707,14 @@ export interface components {
             total: number;
             /** Format: int64 */
             unread: number;
+        };
+        /** @description Typed `POST /admin/notifications/send` response `{event_id, recipients, push}`. */
+        NotificationSendResponse: {
+            /** Format: uuid */
+            event_id: string;
+            push: components["schemas"]["PushSummary"];
+            /** Format: int64 */
+            recipients: number;
         };
         /** @description Standard paginated response `{items, total, page, pageNum}`. */
         PaginationResponse: {
@@ -2650,6 +2731,15 @@ export interface components {
             description?: string | null;
             is_default?: boolean | null;
             name?: string | null;
+        };
+        /** @description One permission definition (matches contract §5 / design §8.2). */
+        PermissionDef: {
+            description: string;
+            group: string;
+            id: string;
+            label: string;
+            risk: components["schemas"]["Risk"];
+            root_only: boolean;
         };
         PhiraLoginRequest: {
             client_type?: string | null;
@@ -2678,6 +2768,14 @@ export interface components {
             device_id: string;
             platform?: string;
             subscription: components["schemas"]["SubscriptionWire"];
+        };
+        PushSummary: {
+            /** Format: int32 */
+            delivered: number;
+            /** Format: int32 */
+            failed: number;
+            /** Format: int32 */
+            not_configured: number;
         };
         ReauthRequest: {
             client_type?: string | null;
@@ -2708,6 +2806,11 @@ export interface components {
             round_uuid: string;
             touches: unknown;
         };
+        /**
+         * @description Risk level attached to a permission.
+         * @enum {string}
+         */
+        Risk: "low" | "medium" | "high" | "critical";
         RollbackBody: {
             /** Format: uuid */
             snapshot_id: string;
@@ -2765,6 +2868,11 @@ export interface components {
         ServerActionBody: {
             action: string;
             args?: unknown;
+        };
+        /** @description Typed server gates (§23 #2 real gate read): `{connections, room_creation}`. */
+        ServerGatesResponse: {
+            connections: boolean;
+            room_creation: boolean;
         };
         /** @description Typed PMP server stats (§23 #6: separate typed schema, not a giant status). */
         ServerStatsResponse: {
@@ -2887,8 +2995,13 @@ export interface components {
             user_id: string;
         };
         /**
-         * @description User security subview (§23 #5: ban_state/reason/ip_history typed; ip_bans
-         *     and banned_at null when PMP doesn't expose them).
+         * @description User security subview (§23 #5).
+         *
+         *     P-87 carve-out: `ip_history` is PMP `player.ip_history` payload (PMP is the
+         *     multiplayer truth source, §13) and stays dynamic JSON rather than a PPB
+         *     reverse-engineered schema. `ip_bans` / `banned_at` are always `null` — PMP
+         *     exposes no IP-ban list or ban timestamp over OpenUDS, so PPB returns null
+         *     rather than fabricating a value.
          */
         UserSecurityResponse: {
             ban_reason?: string | null;
@@ -3667,7 +3780,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ConfigRawResponse"];
+                    "text/plain": string;
                 };
             };
             /** @description permission denied */
@@ -4167,7 +4280,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["JobListResponse"];
                 };
             };
             /** @description permission denied */
@@ -4291,7 +4404,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Job"];
                 };
             };
             /** @description permission denied */
@@ -4369,20 +4482,27 @@ export interface operations {
     };
     admin_logs_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 1-based page index */
+                page?: number | null;
+                /** @description page size (1..=100) */
+                pageNum?: number | null;
+                /** @description raw PMP history window (max 2000) */
+                limit?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description log history */
+            /** @description log history (paginated) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LogListResponse"];
                 };
             };
             /** @description permission denied */
@@ -4506,7 +4626,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["NotificationDeliveryResponse"];
                 };
             };
             /** @description permission denied */
@@ -4539,7 +4659,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["NotificationSendResponse"];
                 };
             };
             /** @description permission denied */
@@ -4568,7 +4688,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PermissionDef"][];
                 };
             };
             /** @description permission denied */
@@ -5171,6 +5291,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description permission denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    admin_server_gates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description server gates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerGatesResponse"];
                 };
             };
             /** @description permission denied */
