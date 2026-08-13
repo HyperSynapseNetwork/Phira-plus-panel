@@ -6,7 +6,7 @@
  */
 
 import type { Paginated } from './api'
-import type { GroupRef, TranslatedError } from './generated'
+import type { GroupRef, PmpStatus, ServerStatusResponse, TranslatedError, components } from './generated'
 import type { RoomActionId, ServerActionId } from '~/config/action-ids'
 
 // Canonical wire types generated from the PPB OpenAPI contract
@@ -189,48 +189,29 @@ export interface RoomBatchResult {
 }
 
 // ---------------------------------------------------------------------------
-// Server (design §18.6)
+// Server (design §18.6 / §23 #6)
 // ---------------------------------------------------------------------------
-export interface ServerStatus {
-  pmp: {
-    connected: boolean
-    version?: string
-    uptime_secs?: number
-    status?: string
-  }
-  ppb?: {
-    version?: string
-    uptime_secs?: number
-  }
-  gates: {
-    connections: boolean
-    room_creation: boolean
-  }
-  counts: {
-    rooms: number
-    users: number
-    sessions: number
-    plugins: number
-  }
-  runtime?: {
-    cpu_percent?: number
-    memory_mb?: number
-    network_rx_bps?: number
-    network_tx_bps?: number
-    disk_percent?: number
-  }
-  update?: {
-    state: 'idle' | 'checking' | 'downloading' | 'verifying' | 'applying' | 'error' | string
-    current_version?: string
-    target_version?: string
-    /** PROPOSED: update check found no newer version. */
-    unchanged?: boolean
-    progress?: number
-    stage?: string
-    error?: string
-    updated_at?: string
-  }
-  metrics?: Array<{ t: string, online: number, rooms: number, sessions: number, errors: number }>
+// The server page composes four typed endpoints instead of one giant status:
+//   GET /admin/server/status  → ServerStatusResponse (ppb_version / pmp / db / metrics)
+//   GET /admin/server/stats   → ServerStatsResponse (PMP counts/ports/uptime)
+//   GET /admin/server/runtime → dynamic JSON (PMP runtime.status, P-90)
+//   GET /admin/jobs           → Job list (update check/apply progress)
+export type { PmpStatus, ServerStatusResponse }
+
+/** `GET /admin/server/stats` → typed PMP stats (§23 #6). */
+export type ServerStatsResponse = components['schemas']['ServerStatsResponse']
+
+/** `GET /admin/server/runtime` → dynamic PMP `runtime.status` payload (P-90). */
+export type ServerRuntime = Record<string, unknown>
+
+/**
+ * Server gate read state. Connection gate is readable via `server.connections`
+ * (no `enabled` = read, §23 #2); room-creation gate has no typed read endpoint
+ * yet (PPB gap) so it stays `null` until PPB adds one.
+ */
+export interface ServerGates {
+  connections: boolean | null
+  room_creation: boolean | null
 }
 
 export type ServerAction = ServerActionId

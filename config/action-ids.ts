@@ -32,18 +32,34 @@ export const ROOM_ACTION = {
 
 export type RoomActionId = (typeof ROOM_ACTION)[keyof typeof ROOM_ACTION]
 
+/**
+ * Server actions (§23 #2 canonical switch): `server.config_reload` /
+ * `server.shutdown` / `server.roomcreation` / `server.connections`.
+ *
+ * NOTE: PMP update operations are NOT server actions anymore — they are
+ * long-running jobs (design §9.4) created via `POST /admin/jobs` with the
+ * `UPDATE_JOB` types below. The old `pmp.update.*` action IDs are retired.
+ */
 export const SERVER_ACTION = {
   configReload: 'server.config_reload',
   shutdown: 'server.shutdown',
   setConnections: 'server.connections',
   setRoomCreation: 'server.roomcreation',
-  updateCheck: 'pmp.update.check',
-  updateApply: 'pmp.update.apply',
-  updateCancel: 'pmp.update.cancel',
-  updateForce: 'pmp.update.force',
 } as const
 
 export type ServerActionId = (typeof SERVER_ACTION)[keyof typeof SERVER_ACTION]
+
+/**
+ * PMP update job types (design §9.4 / §23 #7 honest stage). Update operations
+ * run through the Job API (`POST /admin/jobs` → poll → cancel/retry), not the
+ * Action Registry. `check` is non-destructive; `apply` requires reauth (§23 #10).
+ */
+export const UPDATE_JOB = {
+  check: 'pmp.update.check',
+  apply: 'pmp.update.apply',
+} as const
+
+export type UpdateJobType = (typeof UPDATE_JOB)[keyof typeof UPDATE_JOB]
 
 export const USER_ACTION = {
   ban: 'player.ban',

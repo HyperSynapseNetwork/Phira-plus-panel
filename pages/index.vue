@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { fetchJobs, fetchLogs, fetchServerStatus } from '~/api/admin'
+import { fetchJobs, fetchLogs, fetchServerRuntime, fetchServerStats, fetchServerStatus } from '~/api/admin'
 import AlertCard from '~/components/admin/AlertCard.vue'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import ChartCard from '~/components/admin/ChartCard.vue'
@@ -12,6 +12,8 @@ import { formatDuration, formatNumber, timeAgo } from '~/utils/format'
 definePageMeta({ permissions: ['dashboard:view'] })
 
 const server = useAsync(() => fetchServerStatus())
+const stats = useAsync(() => fetchServerStats())
+const runtime = useAsync(() => fetchServerRuntime())
 const logs = useAsync(() => fetchLogs({ level: 'warn,error', pageNum: 200 }))
 const jobs = useAsync(() => fetchJobs({ pageNum: 50 }))
 
@@ -56,12 +58,10 @@ const alerts = computed<AggregatedAlert[]>(() => {
 const status = computed(() => server.data.value)
 const errorCount = computed(() => (logs.data.value?.items ?? []).filter(e => e.level === 'error').length)
 
-const onlineSeries = computed<Array<[string, number]>>(() =>
-  (status.value?.metrics ?? []).map(m => [m.t, m.online] as [string, number]),
-)
-const roomSeries = computed<Array<[string, number]>>(() =>
-  (status.value?.metrics ?? []).map(m => [m.t, m.rooms] as [string, number]),
-)
+// Time-series chart data source is TBD (no PPB metrics-history endpoint yet).
+// Empty is honest — ChartCard renders "暂无数据" rather than fabricating a trend.
+const onlineSeries = computed<Array<[string, number]>>(() => [])
+const roomSeries = computed<Array<[string, number]>>(() => [])
 
 const healthTone = computed<'success' | 'danger' | 'neutral'>(() => {
   if (status.value?.pmp?.connected === true)
@@ -72,6 +72,13 @@ const healthTone = computed<'success' | 'danger' | 'neutral'>(() => {
 })
 
 const activeJobs = computed(() => (jobs.data.value?.items ?? []).filter(j => j.state === 'running' || j.state === 'queued').length)
+
+const runtimeText = computed(() => {
+  const r = runtime.data.value
+  if (!r || typeof r !== 'object')
+    return '—'
+  return Object.entries(r).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ')
+})
 </script>
 
 <template>
@@ -117,17 +124,17 @@ const activeJobs = computed(() => (jobs.data.value?.items ?? []).filter(j => j.s
     <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
       <KpiCard
         label="在线用户"
-        :value="formatNumber(status?.counts.users)"
+        :value="formatNumber(stats.data.value?.users_online)"
         :hint="status ? `PMP ${status.pmp.connected ? '已连接' : '未连接'}` : 'PPB 未就绪'"
         :tone="status?.pmp.connected ? 'success' : 'neutral'"
       />
-      <KpiCard label="房间" :value="formatNumber(status?.counts.rooms)" hint="当前房间数" />
-      <KpiCard label="会话" :value="formatNumber(status?.counts.sessions)" hint="活动 Session" />
+      <KpiCard label="房间" :value="formatNumber(stats.data.value?.active_rooms)" hint="当前房间数" />
+      <KpiCard label="会话" :value="formatNumber(stats.data.value?.active_sessions)" hint="活动 Session" />
       <KpiCard label="最近错误" :value="formatNumber(errorCount)" hint="近 200 条日志中 ERROR 数" :tone="errorCount > 0 ? 'danger' : 'success'" />
       <KpiCard label="服务器健康" :value="healthTone === 'success' ? '正常' : healthTone === 'danger' ? '异常' : '未知'" :tone="healthTone" hint="PMP 连接状态" />
-      <KpiCard label="PMP 运行时长" :value="formatDuration(status?.pmp.uptime_secs)" hint="PMP uptime" />
+      <KpiCard label="PMP 运行时长" :value="formatDuration(stats.data.value?.uptime_secs)" hint="PMP uptime" />
       <KpiCard label="活跃任务" :value="formatNumber(activeJobs)" hint="running/queued" />
-      <KpiCard label="插件" :value="formatNumber(status?.counts.plugins)" hint="已加载插件数" />
+      <KpiCard label="插件" :value="formatNumber(stats.data.value?.loaded_plugins)" hint="已加载插件数" />
     </div>
 
     <!-- Chart summaries (§18.2) — chart type/range remembered in panel prefs -->
@@ -136,11 +143,9 @@ const activeJobs = computed(() => (jobs.data.value?.items ?? []).filter(j => j.s
       <ChartCard title="房间趋势" chart-id="rooms" :data="roomSeries" />
     </div>
 
-    <AsyncState :loading="server.loading.value" :error="server.error.value" :empty="false">
+    <AsyncState :loading="runtime.loading.value" :error="runtime.error.value" :empty="false">
       <p class="text-xs text-muted">
-        服务器运行时：CPU {{ status?.runtime?.cpu_percent ?? '—' }}% · 内存
-        {{ status?.runtime?.memory_mb ? `${status.runtime.memory_mb} MB` : '—' }} · 磁盘
-        {{ status?.runtime?.disk_percent ?? '—' }}%
+        服务器运行时（runtime.status，动态）：{{ runtimeText }}
       </p>
     </AsyncState>
   </div>

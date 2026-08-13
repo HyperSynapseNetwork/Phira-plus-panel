@@ -33,7 +33,10 @@ import type {
   RunbookPayload,
   RunbookRun,
   ServerAction,
-  ServerStatus,
+  ServerGates,
+  ServerRuntime,
+  ServerStatsResponse,
+  ServerStatusResponse,
   UserDetail,
   UserMultiplayer,
   UserSecurity,
@@ -133,12 +136,40 @@ export function runRoomBatchAction(
   return useApi().post('/admin/rooms/actions/batch', { action, room_ids: roomIds, args, preview })
 }
 
-// --- Server (status/actions/update, §18.6) ---------------------------------
-export function fetchServerStatus(): Promise<ServerStatus> {
+// --- Server (status/stats/runtime/actions/gates, §18.6 / §23 #6) -----------
+export function fetchServerStatus(): Promise<ServerStatusResponse> {
   return useApi().get('/admin/server/status')
+}
+/** `GET /admin/server/stats` → typed PMP stats (§23 #6). */
+export function fetchServerStats(): Promise<ServerStatsResponse> {
+  return useApi().get('/admin/server/stats')
+}
+/** `GET /admin/server/runtime` → dynamic PMP runtime.status payload (P-90). */
+export function fetchServerRuntime(): Promise<ServerRuntime> {
+  return useApi().get('/admin/server/runtime')
 }
 export function runServerAction(action: ServerAction, args: Record<string, unknown> = {}, reauthToken?: string): Promise<ActionExecuteResult> {
   return useApi().fetch('/admin/server/actions', { method: 'POST', body: { action, args }, headers: reauthHeaders(reauthToken) })
+}
+/**
+ * Read server gate state. Connection gate uses `server.connections` with no
+ * `enabled` (backend read path, §23 #2) and parses the CLI output best-effort;
+ * room-creation has no read endpoint yet (PPB gap) → always `null`.
+ */
+export async function fetchServerGates(): Promise<ServerGates> {
+  let connections: boolean | null = null
+  try {
+    const res = await runServerAction('server.connections') as unknown as { output?: unknown }
+    const text = Array.isArray(res.output) ? res.output.map(String).join(' ') : String(res.output ?? '')
+    if (/已关闭|已禁用|\boff\b|disabled/i.test(text))
+      connections = false
+    else if (/已开启|已启用|\bon\b|enabled/i.test(text))
+      connections = true
+  }
+  catch {
+    connections = null
+  }
+  return { connections, room_creation: null }
 }
 
 // --- Config (Form Descriptor model A + snapshot/rollback, §20/§22) ---------
@@ -217,7 +248,23 @@ export function exportAuditCsv(params: AuditFilter = {}): Promise<string> {
 export function fetchJobs(params?: Record<string, unknown>): Promise<Paginated<Job>> {
   return useApi().get('/admin/jobs', params)
 }
-/** Retry a failed job (§9.4 / §17 `POST /jobs/{job_id}/retry`). */
+/** `GET /admin/jobs/{job_id}` — single job detail (§9.4). */
+export function fetchJob(id: string): Promise<Job> {
+  return useApi().get(`/admin/jobs/${id}`)
+}
+/**
+ * `POST /admin/jobs` — start a long job (`pmp.update.check` / `pmp.update.apply`
+ * / `ppf.build` / `backup`). `pmp.update.apply` requires critical reauth (§23 #10).
+ * Response is `{ job }`.
+ */
+export function createJob(type: string, args: Record<string, unknown> = {}, reauthToken?: string): Promise<{ job: Job }> {
+  return useApi().fetch('/admin/jobs', { method: 'POST', body: { type, args }, headers: reauthHeaders(reauthToken) })
+}
+/** `POST /admin/jobs/{job_id}/cancel` — cancel a running/queued job. */
+export function cancelJob(id: string): Promise<{ cancelled: string }> {
+  return useApi().post(`/admin/jobs/${id}/cancel`)
+}
+/** Retry a failed/cancelled job (§9.4 / §17 `POST /jobs/{job_id}/retry`). */
 export function retryJob(id: string): Promise<{ ok: true }> {
   return useApi().post(`/admin/jobs/${id}/retry`)
 }
