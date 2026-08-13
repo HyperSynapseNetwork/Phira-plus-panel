@@ -9,6 +9,7 @@
  * No React runtime, no third-party @heroui/vue package.
  */
 @import "@heroui/styles";
+@import "./tokens.css";
 
 html,
 body,

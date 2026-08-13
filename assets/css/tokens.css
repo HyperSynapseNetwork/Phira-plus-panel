@@ -1,0 +1,75 @@
+/**
+ * Phira+ Design Tokens（Panel）— 设计语言 §二十五 Design Tokens。
+ *
+ * 规范语义词汇 `--pp-*`（与 PPF 共用同一套命名，值按仓分化）。
+ * Panel 定位：工具感 / 高密度 / 安静（§十七/§十九）——深色 tinted canvas、
+ * 半实心 Surface、cyan 只做交互信号、Glass 只留给控制层。
+ *
+ * 底部把 HeroUI 现有语义 token 映射到 `--pp-*`，让组件在词汇收敛期间继续工作。
+ */
+
+:root {
+  /* ── Atmosphere / Canvas（安静深色，NOT 渐变 blob / 网格）── */
+  --pp-atmosphere: #0a0d13;
+  --pp-canvas: #0e1119;
+
+  /* ── Surface（内容层：半实心、可读，NOT 玻璃）── */
+  --pp-surface-0: #10141d;
+  --pp-surface-1: #141925;
+  --pp-surface-2: #1a2030;
+
+  /* ── Material / Glass（仅控制层：header/toolbar/popover/window）── */
+  --pp-material-thin: rgba(20, 25, 37, 0.70);
+  --pp-material-regular: rgba(20, 25, 37, 0.82);
+  --pp-material-thick: rgba(14, 17, 25, 0.92);
+
+  /* ── Border ── */
+  --pp-border-subtle: rgba(255, 255, 255, 0.07);
+  --pp-border-strong: rgba(255, 255, 255, 0.14);
+
+  /* ── Text ── */
+  --pp-text-primary: #e7ebf3;
+  --pp-text-secondary: #a7b1c4;
+  --pp-text-tertiary: #6e7a90;
+
+  /* ── Accent（cyan = 交互信号，NOT theme）── */
+  --pp-accent: #00f0ff;
+  --pp-accent-hover: #34f3ff;
+  --pp-accent-fg: #06232b;
+
+  /* ── Status（功能性，别全用 cyan）── */
+  --pp-success: #34d399;
+  --pp-warning: #fbbf24;
+  --pp-danger: #f87171;
+  --pp-info: #60a5fa;
+  --pp-live: #00f0ff;
+
+  /* ── Radius（语义化层级）── */
+  --pp-radius-control: 8px;
+  --pp-radius-surface: 14px;
+  --pp-radius-window: 20px;
+  --pp-radius-capsule: 999px;
+
+  /* ── Shadow（表达距离，NOT cyan glow）── */
+  --pp-shadow-surface: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --pp-shadow-floating: 0 8px 24px rgba(0, 0, 0, 0.38);
+  --pp-shadow-window: 0 16px 48px rgba(0, 0, 0, 0.52);
+}
+
+/* 映射 HeroUI 现有语义 token → 规范词汇（让 bg-surface / text-foreground /
+ * bg-accent / border-border / text-muted 等继续工作，值收敛到 --pp-*）。 */
+:root {
+  --background: var(--pp-canvas);
+  --foreground: var(--pp-text-primary);
+  --surface: var(--pp-surface-1);
+  --surface-secondary: var(--pp-surface-2);
+  --border: var(--pp-border-subtle);
+  --accent: var(--pp-accent);
+  --accent-soft: color-mix(in oklab, var(--pp-accent) 14%, transparent);
+  --accent-foreground: var(--pp-accent-fg);
+  --muted: var(--pp-text-tertiary);
+  --focus: var(--pp-accent);
+  --success: var(--pp-success);
+  --warning: var(--pp-warning);
+  --danger: var(--pp-danger);
+}
