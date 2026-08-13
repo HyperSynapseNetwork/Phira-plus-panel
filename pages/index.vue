@@ -1,19 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { fetchJobs, fetchLogs, fetchServerRuntime, fetchServerStats, fetchServerStatus } from '~/api/admin'
-import AlertCard from '~/components/admin/AlertCard.vue'
+import { fetchJobs, fetchLogs, fetchServerStats, fetchServerStatus } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
-import ChartCard from '~/components/admin/ChartCard.vue'
-import KpiCard from '~/components/admin/KpiCard.vue'
-import PageHeader from '~/components/admin/PageHeader.vue'
 import { useAsync } from '~/composables/useAsync'
-import { formatDuration, formatNumber, timeAgo } from '~/utils/format'
+import { formatNumber, timeAgo } from '~/utils/format'
 
 definePageMeta({ permissions: ['dashboard:view'] })
 
 const server = useAsync(() => fetchServerStatus())
 const stats = useAsync(() => fetchServerStats())
-const runtime = useAsync(() => fetchServerRuntime())
 const logs = useAsync(() => fetchLogs({ level: 'warn,error', pageNum: 100 }))
 const jobs = useAsync(() => fetchJobs({ pageNum: 50 }))
 
@@ -58,95 +53,92 @@ const alerts = computed<AggregatedAlert[]>(() => {
 const status = computed(() => server.data.value)
 const errorCount = computed(() => (logs.data.value?.items ?? []).filter(e => e.level === 'error').length)
 
-// Time-series chart data source is TBD (no PPB metrics-history endpoint yet).
-// Empty is honest — ChartCard renders "暂无数据" rather than fabricating a trend.
-const onlineSeries = computed<Array<[string, number]>>(() => [])
-const roomSeries = computed<Array<[string, number]>>(() => [])
-
-const healthTone = computed<'success' | 'danger' | 'neutral'>(() => {
+const healthTone = computed<'live' | 'error' | 'warning'>(() => {
   if (status.value?.pmp?.connected === true)
-    return 'success'
+    return 'live'
   if (server.error.value)
-    return 'neutral'
-  return 'danger'
+    return 'warning'
+  return 'error'
 })
 
 const activeJobs = computed(() => (jobs.data.value?.items ?? []).filter(j => j.state === 'running' || j.state === 'queued').length)
-
-const runtimeText = computed(() => {
-  const r = runtime.data.value
-  if (!r || typeof r !== 'object')
-    return '—'
-  return Object.entries(r).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ')
-})
 </script>
 
 <template>
   <div class="space-y-4">
-    <PageHeader title="仪表盘" subtitle="运营概览 · 摘要卡片点击进入对应模块">
-      <template #actions>
-        <span class="text-xs text-muted">数据来源：PPB（未就绪时显示占位）</span>
-      </template>
-    </PageHeader>
+    <h1 class="text-lg font-semibold text-foreground">
+      仪表盘
+    </h1>
 
-    <!-- Operational Alerts (§18.1) -->
-    <section class="rounded-lg border border-border bg-surface p-4">
-      <div class="mb-2 flex items-center justify-between">
-        <h3 class="text-sm font-medium text-foreground">
-          Operational Alerts
-        </h3>
+    <!-- 服务器状态条（单行，非 KPI 方块） -->
+    <section class="flex items-center gap-3 rounded-[var(--pp-radius-surface)] border border-border bg-surface px-4 py-3">
+      <PPStatus :tone="healthTone">
+        {{ healthTone === 'live' ? '运行中' : healthTone === 'error' ? '异常' : '未知' }}
+      </PPStatus>
+      <div class="text-sm">
+        <span class="text-foreground">{{ formatNumber(stats.data.value?.users_online) }}</span>
+        <span class="text-muted"> 在线</span>
+        <span class="text-muted"> · </span>
+        <span class="text-foreground">{{ formatNumber(stats.data.value?.active_rooms) }}</span>
+        <span class="text-muted"> 房间</span>
+      </div>
+      <span class="ml-auto text-xs text-muted">
+        PMP {{ status?.pmp?.connected ? '已连接' : '未连接' }}
+      </span>
+    </section>
+
+    <!-- 运行告警（列表，非卡片网格） -->
+    <section>
+      <div class="mb-1 flex items-center justify-between">
+        <h2 class="text-xs font-medium uppercase tracking-wide text-muted">
+          运行告警
+        </h2>
         <NuxtLink to="/logs" class="text-xs text-muted hover:text-foreground">
-          全部日志 →
+          全部日志
         </NuxtLink>
       </div>
       <AsyncState
         :loading="logs.loading.value"
         :error="logs.error.value"
         :empty="alerts.length === 0"
-        empty-text="暂无 WARN/ERROR 告警"
+        empty-text="暂无告警"
       >
-        <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
-          <AlertCard
+        <ul class="space-y-1">
+          <li
             v-for="a in alerts"
             :key="a.logId"
-            :level="a.level"
-            :error-code="a.errorCode"
-            :message="a.message"
-            :count="a.count"
-            :last-seen-ago="timeAgo(a.lastTs)"
-            :log-id="a.logId"
-          />
-        </div>
+            class="flex items-center gap-3 rounded-[var(--pp-radius-control)] px-2 py-1.5 hover:bg-surface-secondary"
+          >
+            <PPStatus :tone="a.level === 'error' ? 'error' : 'warning'">
+              {{ a.level.toUpperCase() }}
+            </PPStatus>
+            <span class="min-w-0 flex-1 truncate text-sm text-foreground">{{ a.message }}</span>
+            <span class="shrink-0 text-xs text-muted">{{ a.count }} · {{ timeAgo(a.lastTs) }}</span>
+          </li>
+        </ul>
       </AsyncState>
     </section>
 
-    <!-- KPI / summary (§18.1) -->
-    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <KpiCard
-        label="在线用户"
-        :value="formatNumber(stats.data.value?.users_online)"
-        :hint="status ? `PMP ${status.pmp.connected ? '已连接' : '未连接'}` : 'PPB 未就绪'"
-        :tone="status?.pmp.connected ? 'success' : 'neutral'"
-      />
-      <KpiCard label="房间" :value="formatNumber(stats.data.value?.active_rooms)" hint="当前房间数" />
-      <KpiCard label="会话" :value="formatNumber(stats.data.value?.active_sessions)" hint="活动 Session" />
-      <KpiCard label="最近错误" :value="formatNumber(errorCount)" hint="近 200 条日志中 ERROR 数" :tone="errorCount > 0 ? 'danger' : 'success'" />
-      <KpiCard label="服务器健康" :value="healthTone === 'success' ? '正常' : healthTone === 'danger' ? '异常' : '未知'" :tone="healthTone" hint="PMP 连接状态" />
-      <KpiCard label="PMP 运行时长" :value="formatDuration(stats.data.value?.uptime_secs)" hint="PMP uptime" />
-      <KpiCard label="活跃任务" :value="formatNumber(activeJobs)" hint="running/queued" />
-      <KpiCard label="插件" :value="formatNumber(stats.data.value?.loaded_plugins)" hint="已加载插件数" />
+    <!-- 指标（一行，非 8 张 KPI 卡） -->
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+      <span><span class="text-foreground">{{ formatNumber(stats.data.value?.users_online) }}</span> <span class="text-muted">在线</span></span>
+      <span><span class="text-foreground">{{ formatNumber(stats.data.value?.active_rooms) }}</span> <span class="text-muted">房间</span></span>
+      <span><span class="text-foreground">{{ formatNumber(stats.data.value?.active_sessions) }}</span> <span class="text-muted">会话</span></span>
+      <span><span class="text-foreground">{{ formatNumber(activeJobs) }}</span> <span class="text-muted">任务</span></span>
+      <span><span class="text-foreground">{{ formatNumber(stats.data.value?.loaded_plugins) }}</span> <span class="text-muted">插件</span></span>
+      <span v-if="errorCount > 0"><span class="text-danger">{{ errorCount }}</span> <span class="text-muted">错误</span></span>
     </div>
 
-    <!-- Chart summaries (§18.2) — chart type/range remembered in panel prefs -->
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <ChartCard title="在线用户趋势" chart-id="online_users" :data="onlineSeries" />
-      <ChartCard title="房间趋势" chart-id="rooms" :data="roomSeries" />
-    </div>
+    <!-- 在线趋势（暂无 metrics history 数据源，诚实空置） -->
+    <section class="rounded-[var(--pp-radius-surface)] border border-border bg-surface p-4">
+      <h2 class="mb-2 text-sm font-medium text-foreground">在线趋势</h2>
+      <p class="text-sm text-muted">暂无数据</p>
+    </section>
 
-    <AsyncState :loading="runtime.loading.value" :error="runtime.error.value" :empty="false">
-      <p class="text-xs text-muted">
-        服务器运行时（runtime.status，动态）：{{ runtimeText }}
-      </p>
-    </AsyncState>
+    <!-- 最近房间（无房间列表数据源，诚实空置） -->
+    <section class="rounded-[var(--pp-radius-surface)] border border-border bg-surface p-4">
+      <h2 class="mb-2 text-sm font-medium text-foreground">最近房间</h2>
+      <p class="text-sm text-muted">暂无房间</p>
+    </section>
   </div>
 </template>
