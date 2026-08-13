@@ -11,6 +11,8 @@ export default defineNuxtConfig({
   // 纯 SPA：显式关闭 Nitro 预渲染，避免生成 _payload.json（否则会与客户端
   // 状态不一致，触发 "Hydration completed but contains mismatches"）。
   nitro: {
+    // 纯静态输出：不编译 Node server（server/ 中间件 + IPX 都不需要）。
+    preset: 'static',
     prerender: {
       crawlLinks: false,
       routes: [],
