@@ -10,7 +10,6 @@ export default antfu(
   },
   {
     rules: {
-      'vue/no-template-shadow': 'error',
       'no-shadow': 'error',
     },
     ignores: [
@@ -25,10 +24,21 @@ export default antfu(
       // Generated from the PPB OpenAPI contract (scripts/gen-types.sh) —
       // linted by openapi-typescript upstream, not by the panel.
       '**/types/generated.ts',
+      // Design-contract data + vendored PPB OpenAPI (validated by dedicated
+      // contract-consistency / design-contract gates, not by app lint).
+      '**/contracts/**',
       // Standalone Node tooling (contract-consistency checker, type regen) —
       // not part of the app lint surface (same convention as PPF).
       '**/scripts/**',
     ],
+  },
+  {
+    // vue/no-template-shadow crashes when applied to non-.vue files in flat
+    // config (parserServices.getDocumentFragment is undefined) — scope it.
+    files: ['**/*.vue'],
+    rules: {
+      'vue/no-template-shadow': 'error',
+    },
   },
   {
     // The pnpm/yaml-enforce-settings rule forces `trustPolicy: no-downgrade`,
