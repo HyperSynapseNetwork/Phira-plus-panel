@@ -6,8 +6,8 @@ import PPButton from '~/components/ui/PPButton.vue'
 import PPInput from '~/components/ui/PPInput.vue'
 import { useAuthStore } from '~/stores/auth'
 import { localizePanelError } from '~/utils/api-error'
-const { t, locale } = usePanelI18n()
 
+const { t, locale } = usePanelI18n()
 
 definePageMeta({
   requiresAuth: false,
@@ -92,7 +92,9 @@ async function submit() {
     >
       {{ t('auth.githubLogin') }}
     </a>
-    <p class="text-xs text-muted">{{ t('auth.gatewayHint') }}</p>
+    <p class="text-xs text-muted">
+      {{ t('auth.gatewayHint') }}
+    </p>
 
     <div class="flex items-center gap-2 text-xs text-muted">
       <span class="h-px flex-1 bg-border" />

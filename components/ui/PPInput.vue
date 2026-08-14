@@ -51,7 +51,7 @@ function onBlur(event: FocusEvent) {
       :autocomplete="autocomplete"
       :disabled="disabled"
       :required="required"
-      :class="[classes, 'pp-touch-target']"
+      class="pp-touch-target" :class="[classes]"
       @input="onInput"
       @blur="onBlur"
     >

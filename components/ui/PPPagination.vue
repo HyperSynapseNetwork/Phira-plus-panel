@@ -1,5 +1,4 @@
 <script setup lang="ts">
-const { t } = usePanelI18n()
 import { computed } from 'vue'
 
 const props = withDefaults(defineProps<{
@@ -13,6 +12,8 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{ 'update:page': [value: number] }>()
+
+const { t } = usePanelI18n()
 
 const totalPages = computed(() => Math.max(1, Math.ceil(props.total / Math.max(1, props.pageNum))))
 </script>

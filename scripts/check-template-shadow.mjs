@@ -8,10 +8,13 @@ const ignored = new Set(['node_modules', '.nuxt', '.output', 'dist', 'coverage']
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (ignored.has(entry.name)) continue
+    if (ignored.has(entry.name))
+      continue
     const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) walk(full, out)
-    else if (entry.isFile() && entry.name.endsWith('.vue')) out.push(full)
+    if (entry.isDirectory())
+      walk(full, out)
+    else if (entry.isFile() && entry.name.endsWith('.vue'))
+      out.push(full)
   }
   return out
 }
@@ -30,14 +33,16 @@ function scanText(text, label) {
   const vfor = /v-for\s*=\s*["']\s*(\([^"']+?\)|[A-Za-z_$][\w$]*)\s+(?:in|of)\s+/g
   for (const m of text.matchAll(vfor)) {
     for (const alias of aliasesFromVFor(m[1])) {
-      if (reserved.has(alias)) errors.push(`${label}:${lineOf(text, m.index)}: v-for alias '${alias}' shadows a reserved composable name`)
+      if (reserved.has(alias))
+        errors.push(`${label}:${lineOf(text, m.index)}: v-for alias '${alias}' shadows a reserved composable name`)
     }
   }
   const slots = /(?:v-slot(?::[\w-]+)?|#[\w-]+)\s*=\s*["']\s*\{([^"']+)\}\s*["']/g
   for (const m of text.matchAll(slots)) {
     for (const raw of m[1].split(',')) {
       const alias = raw.split(':').pop()?.trim().split('=')[0].trim()
-      if (alias && reserved.has(alias)) errors.push(`${label}:${lineOf(text, m.index)}: slot alias '${alias}' shadows a reserved composable name`)
+      if (alias && reserved.has(alias))
+        errors.push(`${label}:${lineOf(text, m.index)}: slot alias '${alias}' shadows a reserved composable name`)
     }
   }
   return errors
@@ -50,7 +55,7 @@ if (scanText('<tr v-for="t in tasks">{{ t(\'x\') }}</tr>', 'fixture.vue').length
 
 const errors = walk(root).flatMap(file => scanText(fs.readFileSync(file, 'utf8'), path.relative(root, file)))
 if (errors.length) {
-  console.error('FAIL template shadowing:\n  ' + errors.join('\n  '))
+  console.error(`FAIL template shadowing:\n  ${errors.join('\n  ')}`)
   process.exit(1)
 }
 console.log(`template-shadow gate passed: ${walk(root).length} Vue files; reserved aliases clear`)

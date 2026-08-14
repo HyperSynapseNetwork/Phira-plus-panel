@@ -1,11 +1,11 @@
-import zh from '~/i18n/zh.json'
-import en from '~/i18n/en.json'
 import { useApi } from '~/composables/useApi'
+import en from '~/i18n/en.json'
+import zh from '~/i18n/zh.json'
 import { useAuthStore } from '~/stores/auth'
 
 export type PanelLocale = 'zh' | 'en'
 type Params = Record<string, string | number>
-type CommonPreference = { revision?: number, data?: Record<string, unknown> }
+interface CommonPreference { revision?: number, data?: Record<string, unknown> }
 
 const messages = { zh, en } as const
 const STORAGE_KEY = 'pp-panel-language'

@@ -4,17 +4,16 @@ import { computed, ref } from 'vue'
 import { completeAdminTask, createCoupon, fetchAdminTasks, fetchCoupons, revokeCoupon } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
-import PPBadge from '~/components/ui/PPBadge.vue'
-import PPStatus from '~/components/ui/PPStatus.vue'
 import PPButton from '~/components/ui/PPButton.vue'
 import PPInput from '~/components/ui/PPInput.vue'
 import PPModal from '~/components/ui/PPModal.vue'
 import PPSelect from '~/components/ui/PPSelect.vue'
-import PPTextarea from '~/components/ui/PPTextarea.vue'
+import PPStatus from '~/components/ui/PPStatus.vue'
 import PPSurface from '~/components/ui/PPSurface.vue'
+import PPTextarea from '~/components/ui/PPTextarea.vue'
 import { useAsync } from '~/composables/useAsync'
-import { useAuthStore } from '~/stores/auth'
 import { redemptionActionTypeLabel, redemptionStatusLabel, redemptionTaskStatusLabel } from '~/features/redemption/labels'
+import { useAuthStore } from '~/stores/auth'
 import { formatDateTime } from '~/utils/format'
 
 definePageMeta({ permissions: ['coupon:view'] })
@@ -110,7 +109,9 @@ const statusTone = (s: string) => (s === 'active' || s === 'completed' ? 'succes
         </PPButton>
       </template>
     </PageHeader>
-    <p v-if="fieldError" class="mb-2 text-sm text-danger" role="alert">{{ fieldError }}</p>
+    <p v-if="fieldError" class="mb-2 text-sm text-danger" role="alert">
+      {{ fieldError }}
+    </p>
 
     <PPSurface padded>
       <div class="mb-2 flex items-center justify-between">

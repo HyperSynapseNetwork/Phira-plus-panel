@@ -4,16 +4,15 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { cancelRunbookRun, createRunbook, deleteRunbook, fetchRunbookRun, fetchRunbookRuns, fetchRunbooks, runRunbook, updateRunbook } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
-import PPBadge from '~/components/ui/PPBadge.vue'
-import PPStatus from '~/components/ui/PPStatus.vue'
 import PPButton from '~/components/ui/PPButton.vue'
 import PPInput from '~/components/ui/PPInput.vue'
 import PPModal from '~/components/ui/PPModal.vue'
-import PPTextarea from '~/components/ui/PPTextarea.vue'
+import PPStatus from '~/components/ui/PPStatus.vue'
 import PPSurface from '~/components/ui/PPSurface.vue'
+import PPTextarea from '~/components/ui/PPTextarea.vue'
 import { useAsync } from '~/composables/useAsync'
-import { useAuthStore } from '~/stores/auth'
 import { automationStatusLabel } from '~/features/automation/labels'
+import { useAuthStore } from '~/stores/auth'
 import { formatDateTime } from '~/utils/format'
 
 definePageMeta({ permissions: ['automation:view'] })
@@ -137,7 +136,8 @@ function pollRun(runId: string) {
 
 function retryPoll(): void {
   const id = pollingRunId.value ?? liveRun.value?.id
-  if (id) pollRun(id)
+  if (id)
+    pollRun(id)
 }
 
 onBeforeUnmount(stopPoll)
@@ -255,7 +255,9 @@ const liveStep = (r: RunbookRun | null) => r?.current_step != null ? `Step ${r.c
       </div>
       <div v-if="runConnectionLost" class="mb-2 flex flex-wrap items-center justify-between gap-2 border-y border-warning/50 py-2 text-sm text-warning" role="status">
         <span>{{ t('automationPage.connectionLost') }}</span>
-        <PPButton size="sm" weight="secondary" @click="retryPoll">{{ t('common.retry') }}</PPButton>
+        <PPButton size="sm" weight="secondary" @click="retryPoll">
+          {{ t('common.retry') }}
+        </PPButton>
       </div>
 
       <AsyncState :loading="runs.loading.value" :error="runs.error.value" :empty="(runs.data.value?.items ?? []).length === 0">

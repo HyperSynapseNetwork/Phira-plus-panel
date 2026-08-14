@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import PPButton from '~/components/ui/PPButton.vue'
 
-describe('PPButton public primitive', () => {
+describe('pPButton public primitive', () => {
   it('renders contract weight and size', () => {
     const wrapper = mount(PPButton, {
       props: { weight: 'dangerous', size: 'md' },

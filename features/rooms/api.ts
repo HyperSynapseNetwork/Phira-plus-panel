@@ -1,6 +1,6 @@
+import type { RoomBatchActionId } from '~/config/action-ids'
 import type { AdminRoom, RoomActionArgs, RoomActionName, RoomActionResult, RoomBatchResult } from '~/types/admin'
 import type { Paginated } from '~/types/api'
-import type { RoomBatchActionId } from '~/config/action-ids'
 import { useApi } from '~/composables/useApi'
 import { normalizeRoom, normalizeRoomListResponse } from '~/utils/rooms'
 

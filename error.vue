@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { useHead } from 'nuxt/app'
 
-const { t } = usePanelI18n()
-
 defineProps<{
   error?: {
     statusCode?: number
     statusMessage?: string
   } | null
 }>()
+
+const { t } = usePanelI18n()
 
 // Error/fallback page must stay noindex (§23.2 #7).
 useHead({

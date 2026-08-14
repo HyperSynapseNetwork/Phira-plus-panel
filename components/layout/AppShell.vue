@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { usePreferencesStore } from '~/stores/preferences'
 import { useCommonAppearance } from '~/composables/useCommonAppearance'
+import { focusableElements, trapTab, useOverlayManager } from '~/composables/useOverlayManager'
+import { usePreferencesStore } from '~/stores/preferences'
 import AppSidebar from './AppSidebar.vue'
 import AppTopBar from './AppTopBar.vue'
-import { focusableElements, trapTab, useOverlayManager } from '~/composables/useOverlayManager'
 
 const prefs = usePreferencesStore()
 const appearance = useCommonAppearance()
@@ -16,7 +16,8 @@ const drawerEl = ref<HTMLElement | null>(null)
 const overlay = useOverlayManager()
 const drawerOverlayId = 'panel-mobile-drawer'
 function onDrawerKey(event: KeyboardEvent) {
-  if (!mobileOpen.value || !overlay.isTopmost(drawerOverlayId)) return
+  if (!mobileOpen.value || !overlay.isTopmost(drawerOverlayId))
+    return
   if (event.key === 'Escape') { event.preventDefault(); mobileOpen.value = false; return }
   trapTab(event, drawerEl.value)
 }
@@ -27,17 +28,28 @@ const sidebarCollapsed = computed({
 })
 
 onMounted(() => {
-  if (!prefs.loaded) void prefs.load()
-  if (!appearance.loaded.value) void appearance.load()
+  if (!prefs.loaded)
+    void prefs.load()
+  if (!appearance.loaded.value)
+    void appearance.load()
 })
 watch(() => route.path, () => { mobileOpen.value = false })
 watch(mobileOpen, async (open) => {
-  if (!import.meta.client) return
+  if (!import.meta.client)
+    return
   if (open) { overlay.push(drawerOverlayId, 'drawer'); await nextTick(); (focusableElements(drawerEl.value)[0] ?? drawerEl.value)?.focus({ preventScroll: true }) }
-  else overlay.pop(drawerOverlayId)
+  else {
+    overlay.pop(drawerOverlayId)
+  }
 })
-onMounted(() => { if (import.meta.client) window.addEventListener('keydown', onDrawerKey) })
-onBeforeUnmount(() => { if (import.meta.client) window.removeEventListener('keydown', onDrawerKey); overlay.pop(drawerOverlayId) })
+onMounted(() => {
+  if (import.meta.client)
+    window.addEventListener('keydown', onDrawerKey)
+})
+onBeforeUnmount(() => {
+  if (import.meta.client)
+    window.removeEventListener('keydown', onDrawerKey); overlay.pop(drawerOverlayId)
+})
 </script>
 
 <template>

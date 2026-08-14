@@ -102,7 +102,7 @@ const activeJobs = computed(() => (jobs.data.value?.items ?? []).filter(j => j.s
         :loading="logs.loading.value"
         :error="logs.error.value"
         :empty="alerts.length === 0"
-:empty-text="t('dashboard.noAlerts')"
+        :empty-text="t('dashboard.noAlerts')"
       >
         <ul class="space-y-1">
           <li
@@ -129,6 +129,5 @@ const activeJobs = computed(() => (jobs.data.value?.items ?? []).filter(j => j.s
       <span><span class="text-foreground">{{ formatNumber(stats.data.value?.loaded_plugins) }}</span> <span class="text-muted">{{ t('dashboard.plugins') }}</span></span>
       <span v-if="errorCount > 0"><span class="text-danger">{{ errorCount }}</span> <span class="text-muted">{{ t('dashboard.errors') }}</span></span>
     </div>
-
   </div>
 </template>

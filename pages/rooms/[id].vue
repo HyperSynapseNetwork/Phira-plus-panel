@@ -6,11 +6,11 @@ import { fetchRoom, runRoomAction } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
 import PPBadge from '~/components/ui/PPBadge.vue'
-import PPStatus from '~/components/ui/PPStatus.vue'
 import PPButton from '~/components/ui/PPButton.vue'
 import PPInput from '~/components/ui/PPInput.vue'
 import PPModal from '~/components/ui/PPModal.vue'
 import PPSelect from '~/components/ui/PPSelect.vue'
+import PPStatus from '~/components/ui/PPStatus.vue'
 import { useAsync } from '~/composables/useAsync'
 import { ROOM_ACTION } from '~/config/action-ids'
 import { roomStateLabel } from '~/features/rooms/labels'
@@ -100,7 +100,6 @@ const stateTone = (s: string) => (s === 'playing' ? 'live' : s === 'select_chart
 
     <AsyncState :loading="room.loading.value" :error="room.error.value" :empty="false">
       <div class="space-y-4">
-
         <section class="rounded-lg border border-border bg-surface p-4">
           <dl class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
             <div>

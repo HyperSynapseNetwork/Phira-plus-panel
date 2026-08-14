@@ -27,9 +27,15 @@ export function normalizePanelPreferences(raw: unknown): PanelPreferencesData {
   const chartType = input.per_chart_type && typeof input.per_chart_type === 'object' ? input.per_chart_type as Record<string, unknown> : {}
   const chartRange = input.per_chart_range && typeof input.per_chart_range === 'object' ? input.per_chart_range as Record<string, unknown> : {}
   const per_chart_type: Record<string, ChartKind> = {}
-  for (const [id, value] of Object.entries(chartType)) if (value === 'line' || value === 'bar' || value === 'pie') per_chart_type[id] = value
+  for (const [id, value] of Object.entries(chartType)) {
+    if (value === 'line' || value === 'bar' || value === 'pie')
+      per_chart_type[id] = value
+  }
   const per_chart_range: Record<string, string> = {}
-  for (const [id, value] of Object.entries(chartRange)) if (typeof value === 'string' && value.length <= 16) per_chart_range[id] = value
+  for (const [id, value] of Object.entries(chartRange)) {
+    if (typeof value === 'string' && value.length <= 16)
+      per_chart_range[id] = value
+  }
   const sidebar = input.sidebar && typeof input.sidebar === 'object' ? input.sidebar as Record<string, unknown> : {}
   const desktop = input.desktop_window && typeof input.desktop_window === 'object' ? input.desktop_window as Record<string, unknown> : {}
   return {

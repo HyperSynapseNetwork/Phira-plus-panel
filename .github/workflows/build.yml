@@ -61,7 +61,6 @@ jobs:
       - name: Runtime template semantics gate
         run: pnpm test:runtime-semantics
 
-
       - name: Typecheck (vue-tsc)
         run: pnpm vue-tsc
 

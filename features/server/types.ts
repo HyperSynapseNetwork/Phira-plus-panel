@@ -1,6 +1,6 @@
+import type { ServerActionId } from '~/config/action-ids'
 /** Panel domain types. Public wire overlap comes from frozen generated OpenAPI. */
 import type { components, PmpStatus, ServerStatusResponse } from '~/types/generated'
-import type { ServerActionId } from '~/config/action-ids'
 
 // The server page composes four typed endpoints instead of one giant status:
 //   GET /admin/server/status  → ServerStatusResponse (ppb_version / pmp / db / metrics)

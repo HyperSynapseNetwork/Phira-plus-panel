@@ -15,18 +15,17 @@ import {
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
 import ReauthModal from '~/components/admin/ReauthModal.vue'
-import PPBadge from '~/components/ui/PPBadge.vue'
-import PPStatus from '~/components/ui/PPStatus.vue'
-import PPButton from '~/components/ui/PPButton.vue'
 import PPSection from '~/components/patterns/PPSection.vue'
+import PPButton from '~/components/ui/PPButton.vue'
 import PPInput from '~/components/ui/PPInput.vue'
 import PPModal from '~/components/ui/PPModal.vue'
+import PPStatus from '~/components/ui/PPStatus.vue'
 import PPSwitch from '~/components/ui/PPSwitch.vue'
 import { useAsync } from '~/composables/useAsync'
 import { useReauth } from '~/composables/useReauth'
 import { SERVER_ACTION, UPDATE_JOB } from '~/config/action-ids'
-import { useAuthStore } from '~/stores/auth'
 import { jobStageLabel, jobTypeLabel } from '~/features/jobs/labels'
+import { useAuthStore } from '~/stores/auth'
 import { formatDuration, formatNumber } from '~/utils/format'
 
 definePageMeta({ permissions: ['server:view'] })
@@ -58,8 +57,10 @@ const startupSpecs = computed(() => deployment.value?.startup_args ?? [])
 function openStartModal() {
   for (const key of Object.keys(startupValues)) delete startupValues[key]
   for (const spec of startupSpecs.value) {
-    if (spec.kind === 'boolean') startupValues[spec.key] = false
-    else if (spec.allowed_values?.length) startupValues[spec.key] = spec.allowed_values[0] ?? ''
+    if (spec.kind === 'boolean')
+      startupValues[spec.key] = false
+    else if (spec.allowed_values?.length)
+      startupValues[spec.key] = spec.allowed_values[0] ?? ''
     else startupValues[spec.key] = ''
   }
   startModal.value = true
@@ -70,7 +71,8 @@ function buildStartupArgs(): Record<string, unknown> {
   for (const spec of startupSpecs.value) {
     const raw = startupValues[spec.key]
     if (spec.kind === 'boolean') { out[spec.key] = Boolean(raw); continue }
-    if (raw === '' || raw == null) continue
+    if (raw === '' || raw == null)
+      continue
     out[spec.key] = spec.kind === 'integer' ? Number(raw) : String(raw)
   }
   return out
@@ -446,18 +448,32 @@ const runtimeEntries = computed(() => {
 
     <PPSection :title="t('server.maintenance')" :subtitle="t('server.maintenanceSubtitle')">
       <div class="flex flex-wrap gap-2">
-        <PPButton size="sm" weight="secondary" :disabled="busy" @click="act(SERVER_ACTION.configReload)">{{ t('server.reloadConfig') }}</PPButton>
-        <PPButton v-if="deployment?.supervisor_start && canStart" size="sm" weight="primary" :disabled="busy || status.data.value?.pmp.connected" @click="openStartModal">{{ t('server.startMultiplayer') }}</PPButton>
-        <PPButton v-if="deployment?.supervisor_stop && canShutdown" size="sm" weight="secondary" :disabled="busy" @click="confirmSupervisorStop = true">{{ t('server.adapterStop') }}</PPButton>
-        <PPButton v-if="deployment?.backup && auth.hasPermission(['server:manage'])" size="sm" weight="secondary" :disabled="busy" @click="createBackupJob">{{ t('server.backup') }}</PPButton>
+        <PPButton size="sm" weight="secondary" :disabled="busy" @click="act(SERVER_ACTION.configReload)">
+          {{ t('server.reloadConfig') }}
+        </PPButton>
+        <PPButton v-if="deployment?.supervisor_start && canStart" size="sm" weight="primary" :disabled="busy || status.data.value?.pmp.connected" @click="openStartModal">
+          {{ t('server.startMultiplayer') }}
+        </PPButton>
+        <PPButton v-if="deployment?.supervisor_stop && canShutdown" size="sm" weight="secondary" :disabled="busy" @click="confirmSupervisorStop = true">
+          {{ t('server.adapterStop') }}
+        </PPButton>
+        <PPButton v-if="deployment?.backup && auth.hasPermission(['server:manage'])" size="sm" weight="secondary" :disabled="busy" @click="createBackupJob">
+          {{ t('server.backup') }}
+        </PPButton>
       </div>
-      <p class="mt-2 text-xs text-muted">{{ t('server.adapterHint') }}</p>
-      <p v-if="!deployment?.supervisor_start" class="mt-1 text-xs text-warning">{{ t('server.adapterMissing') }}</p>
+      <p class="mt-2 text-xs text-muted">
+        {{ t('server.adapterHint') }}
+      </p>
+      <p v-if="!deployment?.supervisor_start" class="mt-1 text-xs text-warning">
+        {{ t('server.adapterMissing') }}
+      </p>
     </PPSection>
 
     <PPModal :open="startModal" :title="t('server.startTitle')" width="max-w-lg" @close="startModal = false">
       <div class="space-y-3">
-        <p class="text-sm text-muted">{{ t('server.startHint') }}</p>
+        <p class="text-sm text-muted">
+          {{ t('server.startHint') }}
+        </p>
         <label v-for="spec in startupSpecs" :key="spec.key" class="block">
           <span class="mb-1 block text-xs font-medium text-foreground">{{ spec.key }}<span v-if="spec.required" class="text-danger"> *</span></span>
           <PPSwitch v-if="spec.kind === 'boolean'" :model-value="Boolean(startupValues[spec.key])" @update:model-value="v => startupValues[spec.key] = v" />
@@ -466,14 +482,34 @@ const runtimeEntries = computed(() => {
           </PPSelect>
           <PPInput v-else v-model="startupValues[spec.key]" :type="spec.kind === 'integer' ? 'number' : 'text'" />
         </label>
-        <p v-if="startupSpecs.length === 0" class="text-xs text-muted">{{ t('server.noStartupArgs') }}</p>
+        <p v-if="startupSpecs.length === 0" class="text-xs text-muted">
+          {{ t('server.noStartupArgs') }}
+        </p>
       </div>
-      <template #footer><div class="flex justify-end gap-2"><PPButton weight="quiet" @click="startModal = false">{{ t('common.cancel') }}</PPButton><PPButton weight="primary" :disabled="busy" @click="doStart">{{ t('server.continueReauth') }}</PPButton></div></template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <PPButton weight="quiet" @click="startModal = false">
+            {{ t('common.cancel') }}
+          </PPButton><PPButton weight="primary" :disabled="busy" @click="doStart">
+            {{ t('server.continueReauth') }}
+          </PPButton>
+        </div>
+      </template>
     </PPModal>
 
     <PPModal :open="confirmSupervisorStop" :title="t('server.stopTitle')" width="max-w-md" @close="confirmSupervisorStop = false">
-      <p class="text-sm text-foreground">{{ t('server.stopHint') }}</p>
-      <template #footer><div class="flex justify-end gap-2"><PPButton weight="quiet" @click="confirmSupervisorStop = false">{{ t('common.cancel') }}</PPButton><PPButton weight="dangerous" :disabled="busy" @click="doSupervisorStop">{{ t('server.continueReauth') }}</PPButton></div></template>
+      <p class="text-sm text-foreground">
+        {{ t('server.stopHint') }}
+      </p>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <PPButton weight="quiet" @click="confirmSupervisorStop = false">
+            {{ t('common.cancel') }}
+          </PPButton><PPButton weight="dangerous" :disabled="busy" @click="doSupervisorStop">
+            {{ t('server.continueReauth') }}
+          </PPButton>
+        </div>
+      </template>
     </PPModal>
 
     <PPModal :open="confirmShutdown" :title="t('server.shutdownTitle')" width="max-w-md" @close="confirmShutdown = false">

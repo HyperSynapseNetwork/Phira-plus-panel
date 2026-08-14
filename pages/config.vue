@@ -1,21 +1,21 @@
 <script setup lang="ts">
+import type { ConfigValidationIssue } from '~/features/config/types'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { diffConfig, fetchConfigDescriptors, fetchConfigRaw, fetchConfigSnapshots, fetchConfigValues, rollbackConfig, saveConfig, validateConfig } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
 import ReauthModal from '~/components/admin/ReauthModal.vue'
-import PPBadge from '~/components/ui/PPBadge.vue'
-import PPStatus from '~/components/ui/PPStatus.vue'
-import PPButton from '~/components/ui/PPButton.vue'
 import PPSection from '~/components/patterns/PPSection.vue'
+import PPBadge from '~/components/ui/PPBadge.vue'
+import PPButton from '~/components/ui/PPButton.vue'
 import PPInput from '~/components/ui/PPInput.vue'
 import PPModal from '~/components/ui/PPModal.vue'
+import PPStatus from '~/components/ui/PPStatus.vue'
 import PPSwitch from '~/components/ui/PPSwitch.vue'
 import PPTextarea from '~/components/ui/PPTextarea.vue'
 import { useAsync } from '~/composables/useAsync'
 import { useReauth } from '~/composables/useReauth'
 import { formatDateTime } from '~/utils/format'
-import type { ConfigValidationIssue } from '~/features/config/types'
 
 definePageMeta({ permissions: ['config:view'] })
 
@@ -212,146 +212,153 @@ function submitRollback() {
     </nav>
 
     <div v-if="validationErrors.length" class="rounded border border-warning/40 bg-warning/5 px-3 py-2 text-sm" role="alert">
-      <p class="font-medium text-warning">{{ t('configPage.validation') }}</p>
+      <p class="font-medium text-warning">
+        {{ t('configPage.validation') }}
+      </p>
       <ul class="mt-1 space-y-0.5 text-xs text-muted">
-        <li v-for="item in validationErrors" :key="`${item.path}:${item.code}`">{{ item.path ? `${item.path}: ` : '' }}{{ validationMessage(item) }}</li>
+        <li v-for="item in validationErrors" :key="`${item.path}:${item.code}`">
+          {{ item.path ? `${item.path}: ` : '' }}{{ validationMessage(item) }}
+        </li>
       </ul>
     </div>
 
     <AsyncState :loading="descriptors.loading.value || values.loading.value" :error="descriptors.error.value || values.error.value" :empty="false">
-
       <div class="space-y-4">
         <div v-for="group in groups" :id="`config-${group.key}`" :key="group.key" class="scroll-mt-20">
-        <PPSection :title="group.label">
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div v-for="d in group.fields" :key="d.path">
-              <div class="mb-1 flex items-center gap-2">
-                <span class="text-sm font-medium text-foreground">{{ d.label }}</span>
-                <PPBadge :tone="reloadTone(d.reload_semantics)">
-                  {{ d.reload_semantics }}
-                </PPBadge>
-                <PPBadge v-if="d.sensitive" tone="warning">
-                  {{ t('configPage.secret') }}
-                </PPBadge>
-              </div>
-              <p v-if="d.description" class="mb-1 text-xs text-muted">
-                {{ d.description }}
-              </p>
+          <PPSection :title="group.label">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div v-for="d in group.fields" :key="d.path">
+                <div class="mb-1 flex items-center gap-2">
+                  <span class="text-sm font-medium text-foreground">{{ d.label }}</span>
+                  <PPBadge :tone="reloadTone(d.reload_semantics)">
+                    {{ d.reload_semantics }}
+                  </PPBadge>
+                  <PPBadge v-if="d.sensitive" tone="warning">
+                    {{ t('configPage.secret') }}
+                  </PPBadge>
+                </div>
+                <p v-if="d.description" class="mb-1 text-xs text-muted">
+                  {{ d.description }}
+                </p>
 
-              <!-- secret → configured / missing / replace（不回显原值，§20.1） -->
-              <div v-if="d.sensitive" class="flex flex-wrap items-center gap-2">
-                <PPStatus :tone="secretStatus(d.path) === 'configured' ? 'success' : 'warning'">
-                  {{ secretStatus(d.path) === 'configured' ? t('configPage.configured') : t('configPage.missing') }}
-                </PPStatus>
-                <template v-if="replaceSecrets.has(d.path)">
-                  <PPInput
-                    v-model="secretValue[d.path]"
-                    type="password"
-                    :placeholder="t('configPage.newSecret')"
-                    class="w-56"
-                  />
-                  <PPButton size="sm" weight="quiet" @click="toggleReplace(d.path)">
-                    {{ t('common.cancel') }}
+                <!-- secret → configured / missing / replace（不回显原值，§20.1） -->
+                <div v-if="d.sensitive" class="flex flex-wrap items-center gap-2">
+                  <PPStatus :tone="secretStatus(d.path) === 'configured' ? 'success' : 'warning'">
+                    {{ secretStatus(d.path) === 'configured' ? t('configPage.configured') : t('configPage.missing') }}
+                  </PPStatus>
+                  <template v-if="replaceSecrets.has(d.path)">
+                    <PPInput
+                      v-model="secretValue[d.path]"
+                      type="password"
+                      :placeholder="t('configPage.newSecret')"
+                      class="w-56"
+                    />
+                    <PPButton size="sm" weight="quiet" @click="toggleReplace(d.path)">
+                      {{ t('common.cancel') }}
+                    </PPButton>
+                  </template>
+                  <PPButton
+                    v-else
+                    size="sm"
+                    weight="secondary"
+                    :disabled="!isEditable(d.reload_semantics)"
+                    @click="toggleReplace(d.path)"
+                  >
+                    {{ secretStatus(d.path) === 'configured' ? t('configPage.replace') : t('configPage.configure') }}
                   </PPButton>
-                </template>
-                <PPButton
-                  v-else
-                  size="sm"
-                  weight="secondary"
+                </div>
+                <!-- boolean → switch -->
+                <PPSwitch
+                  v-else-if="d.type === 'boolean'"
+                  v-model="form[d.path]"
                   :disabled="!isEditable(d.reload_semantics)"
-                  @click="toggleReplace(d.path)"
-                >
-                  {{ secretStatus(d.path) === 'configured' ? t('configPage.replace') : t('configPage.configure') }}
-                </PPButton>
+                />
+                <!-- number -->
+                <PPInput
+                  v-else-if="d.type === 'number'"
+                  v-model="form[d.path]"
+                  type="number"
+                  :disabled="!isEditable(d.reload_semantics)"
+                  :placeholder="String(form[d.path] ?? '')"
+                />
+                <!-- textarea / yaml -->
+                <PPTextarea
+                  v-else-if="d.widget === 'textarea' || d.widget === 'yaml'"
+                  v-model="form[d.path]"
+                  :rows="d.widget === 'textarea' ? 3 : 5"
+                  :mono="d.widget === 'yaml'"
+                  :placeholder="String(form[d.path] ?? '')"
+                  :disabled="!isEditable(d.reload_semantics)"
+                />
+                <!-- string / text fallback -->
+                <PPInput
+                  v-else
+                  v-model="form[d.path]"
+                  :disabled="!isEditable(d.reload_semantics)"
+                  :placeholder="String(form[d.path] ?? '')"
+                />
+                <p v-if="!isEditable(d.reload_semantics)" class="mt-1 text-[11px] text-warning">
+                  {{ t('configPage.reloadRequired', { mode: d.reload_semantics }) }}
+                </p>
               </div>
-              <!-- boolean → switch -->
-              <PPSwitch
-                v-else-if="d.type === 'boolean'"
-                v-model="form[d.path]"
-                :disabled="!isEditable(d.reload_semantics)"
-              />
-              <!-- number -->
-              <PPInput
-                v-else-if="d.type === 'number'"
-                v-model="form[d.path]"
-                type="number"
-                :disabled="!isEditable(d.reload_semantics)"
-                :placeholder="String(form[d.path] ?? '')"
-              />
-              <!-- textarea / yaml -->
-              <PPTextarea
-                v-else-if="d.widget === 'textarea' || d.widget === 'yaml'"
-                v-model="form[d.path]"
-                :rows="d.widget === 'textarea' ? 3 : 5"
-                :mono="d.widget === 'yaml'"
-                :placeholder="String(form[d.path] ?? '')"
-                :disabled="!isEditable(d.reload_semantics)"
-              />
-              <!-- string / text fallback -->
-              <PPInput
-                v-else
-                v-model="form[d.path]"
-                :disabled="!isEditable(d.reload_semantics)"
-                :placeholder="String(form[d.path] ?? '')"
-              />
-              <p v-if="!isEditable(d.reload_semantics)" class="mt-1 text-[11px] text-warning">
-                {{ t('configPage.reloadRequired', { mode: d.reload_semantics }) }}
-              </p>
             </div>
-          </div>
-        </PPSection>
+          </PPSection>
         </div>
 
         <div id="config-snapshots" class="scroll-mt-20">
-        <PPSection :title="t('configPage.snapshots')">
-          <AsyncState :loading="snapshots.loading.value" :error="snapshots.error.value" :empty="(snapshots.data.value?.items ?? []).length === 0">
-            <table class="w-full text-left text-sm">
-              <thead>
-                <tr class="border-b border-border text-xs uppercase text-muted">
-                  <th class="px-2 py-1">
-                    ID
-                  </th><th class="px-2 py-1">
-                    {{ t('configPage.note') }}
-                  </th><th class="px-2 py-1">
-                    {{ t('configPage.scope') }}
-                  </th><th class="px-2 py-1">
-                    {{ t('configPage.time') }}
-                  </th><th class="px-2 py-1">
-                    {{ t('configPage.actions') }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="s in snapshots.data.value?.items ?? []" :key="s.id" class="border-b border-border last:border-0">
-                  <td class="px-2 py-1.5 font-mono text-muted">
-                    {{ s.id.slice(0, 8) }}
-                  </td>
-                  <td class="px-2 py-1.5">
-                    {{ s.note || '' }}
-                  </td>
-                  <td class="px-2 py-1.5 text-muted">
-                    {{ s.scope }}
-                  </td>
-                  <td class="px-2 py-1.5 text-muted">
-                    {{ formatDateTime(s.created_at) }}
-                  </td>
-                  <td class="px-2 py-1.5">
-                    <PPButton size="sm" weight="secondary" @click="rollbackTarget = s.id">
-                      {{ t('configPage.rollback') }}
-                    </PPButton>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </AsyncState>
-        </PPSection>
+          <PPSection :title="t('configPage.snapshots')">
+            <AsyncState :loading="snapshots.loading.value" :error="snapshots.error.value" :empty="(snapshots.data.value?.items ?? []).length === 0">
+              <table class="w-full text-left text-sm">
+                <thead>
+                  <tr class="border-b border-border text-xs uppercase text-muted">
+                    <th class="px-2 py-1">
+                      ID
+                    </th><th class="px-2 py-1">
+                      {{ t('configPage.note') }}
+                    </th><th class="px-2 py-1">
+                      {{ t('configPage.scope') }}
+                    </th><th class="px-2 py-1">
+                      {{ t('configPage.time') }}
+                    </th><th class="px-2 py-1">
+                      {{ t('configPage.actions') }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="s in snapshots.data.value?.items ?? []" :key="s.id" class="border-b border-border last:border-0">
+                    <td class="px-2 py-1.5 font-mono text-muted">
+                      {{ s.id.slice(0, 8) }}
+                    </td>
+                    <td class="px-2 py-1.5">
+                      {{ s.note || '' }}
+                    </td>
+                    <td class="px-2 py-1.5 text-muted">
+                      {{ s.scope }}
+                    </td>
+                    <td class="px-2 py-1.5 text-muted">
+                      {{ formatDateTime(s.created_at) }}
+                    </td>
+                    <td class="px-2 py-1.5">
+                      <PPButton size="sm" weight="secondary" @click="rollbackTarget = s.id">
+                        {{ t('configPage.rollback') }}
+                      </PPButton>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </AsyncState>
+          </PPSection>
         </div>
       </div>
     </AsyncState>
 
     <div class="sticky bottom-3 z-[var(--pp-z-sticky)] flex items-center justify-end gap-2 rounded-lg border border-border bg-canvas/95 px-3 py-2 shadow-lg backdrop-blur">
-      <PPButton size="sm" weight="secondary" @click="openRaw">{{ t('configPage.rawTitle') }}</PPButton>
-      <PPButton size="sm" weight="primary" :disabled="busy" @click="previewDiff">{{ t('configPage.diff') }}</PPButton>
+      <PPButton size="sm" weight="secondary" @click="openRaw">
+        {{ t('configPage.rawTitle') }}
+      </PPButton>
+      <PPButton size="sm" weight="primary" :disabled="busy" @click="previewDiff">
+        {{ t('configPage.diff') }}
+      </PPButton>
     </div>
 
     <!-- Diff preview modal -->
@@ -383,12 +390,18 @@ function submitRollback() {
     <PPModal :open="rawModal" :title="t('configPage.rawTitle')" width="max-w-2xl" @close="rawModal = false">
       <AsyncState :loading="rawLoading" :error="rawError">
         <PPTextarea :model-value="rawText" :rows="16" mono :label="t('configPage.rawLabel')" disabled />
-        <p class="mt-2 text-xs text-muted">{{ t('configPage.rawHint') }}</p>
+        <p class="mt-2 text-xs text-muted">
+          {{ t('configPage.rawHint') }}
+        </p>
       </AsyncState>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <PPButton v-if="rawError" weight="secondary" @click="loadRaw">{{ t('common.retry') }}</PPButton>
-          <PPButton weight="quiet" @click="rawModal = false">{{ t('common.close') }}</PPButton>
+          <PPButton v-if="rawError" weight="secondary" @click="loadRaw">
+            {{ t('common.retry') }}
+          </PPButton>
+          <PPButton weight="quiet" @click="rawModal = false">
+            {{ t('common.close') }}
+          </PPButton>
         </div>
       </template>
     </PPModal>

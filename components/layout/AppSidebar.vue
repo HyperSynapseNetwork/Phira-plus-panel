@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import PPIcon from '~/components/ui/PPIcon.vue'
 import { ADMIN_NAVIGATION } from '~/config/admin-navigation'
 import { useAuthStore } from '~/stores/auth'
-import PPIcon from '~/components/ui/PPIcon.vue'
 
 const props = withDefaults(defineProps<{ collapsed: boolean, mobile?: boolean }>(), { mobile: false })
 const emit = defineEmits<{ toggle: [], navigate: [] }>()

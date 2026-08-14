@@ -153,14 +153,14 @@ async function openEntry(e: LogEntry) {
   translation.value = localTranslate({ code: e.error_code, message: e.message })
   try {
     // §23 P-91: request `{code}`, consume `{code, translated: {...} | null}`.
-    const t = await translateLog(e.error_code ?? '')
-    if (t.translated) {
+    const result = await translateLog(e.error_code ?? '')
+    if (result.translated) {
       translation.value = {
-        title: t.translated.title,
-        explanation: t.translated.explanation,
-        module: t.translated.module,
-        severity: t.translated.severity,
-        suggestion: t.translated.suggestion ?? undefined,
+        title: result.translated.title,
+        explanation: result.translated.explanation,
+        module: result.translated.module,
+        severity: result.translated.severity,
+        suggestion: result.translated.suggestion ?? undefined,
       }
     }
   }

@@ -1,6 +1,6 @@
 import { defineNuxtPlugin } from 'nuxt/app'
-import { useAuthStore } from '~/stores/auth'
 import { usePanelI18n } from '~/composables/usePanelI18n'
+import { useAuthStore } from '~/stores/auth'
 
 /**
  * Probe the PPB session on startup (SPA). The session cookie is HttpOnly;

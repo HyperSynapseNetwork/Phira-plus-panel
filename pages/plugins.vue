@@ -3,13 +3,12 @@ import { ref } from 'vue'
 import { callPlugin, fetchPlugins, pluginAction } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
-import PPBadge from '~/components/ui/PPBadge.vue'
-import PPStatus from '~/components/ui/PPStatus.vue'
 import PPButton from '~/components/ui/PPButton.vue'
 import PPInput from '~/components/ui/PPInput.vue'
 import PPModal from '~/components/ui/PPModal.vue'
-import PPTextarea from '~/components/ui/PPTextarea.vue'
+import PPStatus from '~/components/ui/PPStatus.vue'
 import PPSurface from '~/components/ui/PPSurface.vue'
+import PPTextarea from '~/components/ui/PPTextarea.vue'
 import { useAsync } from '~/composables/useAsync'
 
 definePageMeta({ permissions: ['plugin:view'] })
@@ -77,7 +76,7 @@ async function doCall() {
     }
   }
   try {
-    const res = await callPlugin(callTarget.value, callMethod.value || undefined, parsed)
+    await callPlugin(callTarget.value, callMethod.value || undefined, parsed)
     notice.success('notice.actionCompleted', { dedupKey: `plugin:${callTarget.value}:call` })
     callTarget.value = null
   }
@@ -100,7 +99,9 @@ async function doCall() {
       </template>
     </PageHeader>
 
-    <p v-if="fieldError" class="mb-2 text-sm text-danger" role="alert">{{ fieldError }}</p>
+    <p v-if="fieldError" class="mb-2 text-sm text-danger" role="alert">
+      {{ fieldError }}
+    </p>
 
     <AsyncState :loading="list.loading.value" :error="list.error.value" :empty="(list.data.value ?? []).length === 0">
       <div class="space-y-2">

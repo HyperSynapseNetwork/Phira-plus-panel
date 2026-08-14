@@ -12,16 +12,26 @@
  *   3. total call count cannot silently collapse below the reviewed baseline;
  *   4. an internal synthetic unknown endpoint MUST be rejected by the matcher.
  */
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { resolve, join, relative, sep } from 'node:path'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative, resolve, sep } from 'node:path'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const OPENAPI_URL = process.env.PPB_OPENAPI_URL
   || 'https://raw.githubusercontent.com/HyperSynapseNetwork/Phira-plus-Backend/main/contracts/openapi.json'
 const SCAN_RE = /\.(ts|tsx|vue|mjs|js)$/
 const EXCLUDED_DIRS = new Set([
-  'node_modules', '.nuxt', '.output', 'dist', '.git', 'coverage',
-  'contracts', 'types', 'scripts', 'docs', 'public', '.github',
+  'node_modules',
+  '.nuxt',
+  '.output',
+  'dist',
+  '.git',
+  'coverage',
+  'contracts',
+  'types',
+  'scripts',
+  'docs',
+  'public',
+  '.github',
 ])
 const EXCLUDED_FILES = new Set(['nuxt.config.ts'])
 const baseline = JSON.parse(readFileSync(resolve(ROOT, 'scripts/contract-scan-baseline.json'), 'utf8'))
@@ -168,7 +178,7 @@ function selfTest(index) {
   const known = index.find(e => e.methods.has('get') && e.path.startsWith('/api/v1/'))
   if (!known)
     throw new Error('self-test failed: OpenAPI has no GET endpoint to validate matcher')
-  const concrete = '/' + known.segments.map((s, i) => s === '{param}' ? `selftest-${i}` : s).join('/')
+  const concrete = `/${known.segments.map((s, i) => s === '{param}' ? `selftest-${i}` : s).join('/')}`
   if (!findMatch(index, { method: 'GET', path: concrete }))
     throw new Error(`self-test failed: known endpoint matcher failed for ${known.path}`)
 }
@@ -199,7 +209,7 @@ async function main() {
     for (const call of calls) {
       const loc = `${rel}:${lineAt(src, call.index)}`
       if (call.path.startsWith('/ws/v1')) {
-        if (allowlist.ws.some(p => p === call.path))
+        if (allowlist.ws.includes(call.path))
           allowed++
         else
           misses.push({ loc, method: call.method, path: call.path, why: 'WS endpoint not registered' })

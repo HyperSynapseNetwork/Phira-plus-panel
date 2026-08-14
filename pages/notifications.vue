@@ -5,13 +5,13 @@ import { fetchNotificationDelivery, sendAdminNotification } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
 import PPBadge from '~/components/ui/PPBadge.vue'
-import PPStatus from '~/components/ui/PPStatus.vue'
 import PPButton from '~/components/ui/PPButton.vue'
 import PPInput from '~/components/ui/PPInput.vue'
-import PPSelect from '~/components/ui/PPSelect.vue'
-import PPTextarea from '~/components/ui/PPTextarea.vue'
 import PPModal from '~/components/ui/PPModal.vue'
+import PPSelect from '~/components/ui/PPSelect.vue'
+import PPStatus from '~/components/ui/PPStatus.vue'
 import PPSurface from '~/components/ui/PPSurface.vue'
+import PPTextarea from '~/components/ui/PPTextarea.vue'
 import { useAsync } from '~/composables/useAsync'
 import { formatDateTime } from '~/utils/format'
 
@@ -50,10 +50,14 @@ const ACTION_OPTIONS = computed(() => [
 ])
 
 const actionTargetLabel = computed(() => {
-  if (actionType.value === 'join_room' || actionType.value === 'open_room') return t('notificationAdmin.roomId')
-  if (actionType.value === 'friend_accept' || actionType.value === 'friend_reject') return t('notificationAdmin.friendRequestId')
-  if (actionType.value === 'open_chart') return t('notificationAdmin.chartId')
-  if (actionType.value === 'open_replay') return t('notificationAdmin.roundUuid')
+  if (actionType.value === 'join_room' || actionType.value === 'open_room')
+    return t('notificationAdmin.roomId')
+  if (actionType.value === 'friend_accept' || actionType.value === 'friend_reject')
+    return t('notificationAdmin.friendRequestId')
+  if (actionType.value === 'open_chart')
+    return t('notificationAdmin.chartId')
+  if (actionType.value === 'open_replay')
+    return t('notificationAdmin.roundUuid')
   return t('notificationAdmin.phiraId')
 })
 
@@ -63,8 +67,10 @@ const previewSummary = computed(() => {
   const groups = form.value.groupIds.split(',').map(value => value.trim()).filter(Boolean)
   const users = form.value.userIds.split(',').map(value => value.trim()).filter(Boolean)
   const parts: string[] = []
-  if (groups.length) parts.push(t('notificationAdmin.groupsCount', { count: groups.length }))
-  if (users.length) parts.push(t('notificationAdmin.usersCount', { count: users.length }))
+  if (groups.length)
+    parts.push(t('notificationAdmin.groupsCount', { count: groups.length }))
+  if (users.length)
+    parts.push(t('notificationAdmin.usersCount', { count: users.length }))
   return parts.join(' · ') || t('notificationAdmin.none')
 })
 
@@ -132,9 +138,12 @@ function statusTone(status: string) {
   return status === 'delivered' ? 'success' : status === 'failed' ? 'error' : 'warning'
 }
 function statusLabel(status: string): string {
-  if (status === 'delivered') return t('notificationAdmin.delivered')
-  if (status === 'failed') return t('notificationAdmin.failed')
-  if (status === 'queued') return t('notificationAdmin.queued')
+  if (status === 'delivered')
+    return t('notificationAdmin.delivered')
+  if (status === 'failed')
+    return t('notificationAdmin.failed')
+  if (status === 'queued')
+    return t('notificationAdmin.queued')
   return status
 }
 </script>
@@ -169,51 +178,89 @@ function statusLabel(status: string): string {
       </div>
 
       <div class="mt-4 border-t border-border pt-4">
-        <p class="mb-2 text-sm font-medium text-foreground">{{ t('notificationAdmin.actions') }}</p>
+        <p class="mb-2 text-sm font-medium text-foreground">
+          {{ t('notificationAdmin.actions') }}
+        </p>
         <div class="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,0.8fr)_minmax(0,1fr)_auto]">
           <PPInput v-model="actionLabel" :placeholder="t('notificationAdmin.actionLabel')" />
           <PPSelect v-model="actionType" :options="ACTION_OPTIONS" @update:model-value="actionTarget = ''; actionFieldError = ''" />
           <PPInput v-model="actionTarget" :placeholder="actionTargetLabel" />
-          <PPButton size="sm" weight="secondary" @click="addAction">{{ t('notificationAdmin.addAction') }}</PPButton>
+          <PPButton size="sm" weight="secondary" @click="addAction">
+            {{ t('notificationAdmin.addAction') }}
+          </PPButton>
         </div>
-        <p v-if="actionFieldError" class="mt-1 text-xs text-danger" role="alert">{{ actionFieldError }}</p>
+        <p v-if="actionFieldError" class="mt-1 text-xs text-danger" role="alert">
+          {{ actionFieldError }}
+        </p>
         <div class="mt-2 flex flex-wrap gap-1">
           <PPBadge v-for="(action, index) in actions" :key="`${action.action}:${index}`" tone="accent">
             {{ action.label }} → {{ action.action }}
-            <button type="button" data-pp-touch-critical="removable-action" class="pp-touch-target ml-1 inline-flex h-11 w-11 items-center justify-center rounded text-muted hover:bg-surface-tertiary hover:text-foreground" :aria-label="t('common.remove')" @click="actions.splice(index, 1)"><PPIcon name="close" :size="14" /></button>
+            <button type="button" data-pp-touch-critical="removable-action" class="pp-touch-target ml-1 inline-flex h-11 w-11 items-center justify-center rounded text-muted hover:bg-surface-tertiary hover:text-foreground" :aria-label="t('common.remove')" @click="actions.splice(index, 1)">
+              <PPIcon name="close" :size="14" />
+            </button>
           </PPBadge>
         </div>
       </div>
 
       <div class="mt-4 flex justify-end gap-2">
-        <PPButton weight="secondary" :disabled="!form.title || !form.body" @click="previewOpen = true">{{ t('notificationAdmin.preview') }}</PPButton>
-        <PPButton weight="primary" :disabled="busy || !form.title || !form.body" @click="send">{{ t('notificationAdmin.send') }}</PPButton>
+        <PPButton weight="secondary" :disabled="!form.title || !form.body" @click="previewOpen = true">
+          {{ t('notificationAdmin.preview') }}
+        </PPButton>
+        <PPButton weight="primary" :disabled="busy || !form.title || !form.body" @click="send">
+          {{ t('notificationAdmin.send') }}
+        </PPButton>
       </div>
     </PPSurface>
 
     <PPSurface padded>
       <div class="mb-2 flex items-center justify-between">
-        <h3 class="text-sm font-medium text-foreground">{{ t('notificationAdmin.delivery') }}</h3>
-        <PPButton size="sm" weight="secondary" @click="delivery.run()">{{ t('notificationAdmin.refresh') }}</PPButton>
+        <h3 class="text-sm font-medium text-foreground">
+          {{ t('notificationAdmin.delivery') }}
+        </h3>
+        <PPButton size="sm" weight="secondary" @click="delivery.run()">
+          {{ t('notificationAdmin.refresh') }}
+        </PPButton>
       </div>
       <AsyncState :loading="delivery.loading.value" :error="delivery.error.value" :empty="(delivery.data.value?.items ?? []).length === 0">
         <table class="w-full text-left text-sm">
           <thead>
             <tr class="border-b border-border text-xs uppercase text-muted">
-              <th class="px-2 py-1">{{ t('notificationAdmin.type') }}</th>
-              <th class="px-2 py-1">{{ t('notificationAdmin.messageTitle') }}</th>
-              <th class="px-2 py-1">{{ t('notificationAdmin.target') }}</th>
-              <th class="px-2 py-1">{{ t('notificationAdmin.status') }}</th>
-              <th class="px-2 py-1">{{ t('notificationAdmin.sentAt') }}</th>
+              <th class="px-2 py-1">
+                {{ t('notificationAdmin.type') }}
+              </th>
+              <th class="px-2 py-1">
+                {{ t('notificationAdmin.messageTitle') }}
+              </th>
+              <th class="px-2 py-1">
+                {{ t('notificationAdmin.target') }}
+              </th>
+              <th class="px-2 py-1">
+                {{ t('notificationAdmin.status') }}
+              </th>
+              <th class="px-2 py-1">
+                {{ t('notificationAdmin.sentAt') }}
+              </th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="item in delivery.data.value?.items ?? []" :key="item.id" class="border-b border-border last:border-0">
-              <td class="px-2 py-1.5 text-muted">{{ item.type }}</td>
-              <td class="px-2 py-1.5">{{ item.title }}</td>
-              <td class="px-2 py-1.5 text-muted">{{ item.target_summary }}</td>
-              <td class="px-2 py-1.5"><PPStatus :tone="statusTone(item.status)">{{ statusLabel(item.status) }}</PPStatus></td>
-              <td class="px-2 py-1.5 text-muted">{{ formatDateTime(item.sent_at) }}</td>
+              <td class="px-2 py-1.5 text-muted">
+                {{ item.type }}
+              </td>
+              <td class="px-2 py-1.5">
+                {{ item.title }}
+              </td>
+              <td class="px-2 py-1.5 text-muted">
+                {{ item.target_summary }}
+              </td>
+              <td class="px-2 py-1.5">
+                <PPStatus :tone="statusTone(item.status)">
+                  {{ statusLabel(item.status) }}
+                </PPStatus>
+              </td>
+              <td class="px-2 py-1.5 text-muted">
+                {{ formatDateTime(item.sent_at) }}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -222,20 +269,32 @@ function statusLabel(status: string): string {
 
     <PPModal :open="previewOpen" :title="t('notificationAdmin.previewTitle')" width="max-w-lg" @close="previewOpen = false">
       <div class="space-y-3">
-        <p class="text-sm text-muted">{{ t('notificationAdmin.target') }}: <span class="font-medium text-foreground">{{ previewSummary }}</span></p>
+        <p class="text-sm text-muted">
+          {{ t('notificationAdmin.target') }}: <span class="font-medium text-foreground">{{ previewSummary }}</span>
+        </p>
         <div class="rounded-lg border border-border p-3">
           <div class="flex items-center justify-between">
             <span class="text-sm font-medium text-foreground">{{ form.title }}</span>
-            <PPBadge tone="info">{{ form.priority }}</PPBadge>
+            <PPBadge tone="info">
+              {{ form.priority }}
+            </PPBadge>
           </div>
-          <p class="mt-2 text-sm text-foreground">{{ form.body }}</p>
+          <p class="mt-2 text-sm text-foreground">
+            {{ form.body }}
+          </p>
           <div v-if="actions.length" class="mt-2 flex flex-wrap gap-1">
-            <PPBadge v-for="(action, index) in actions" :key="index" tone="accent">{{ action.label }}</PPBadge>
+            <PPBadge v-for="(action, index) in actions" :key="index" tone="accent">
+              {{ action.label }}
+            </PPBadge>
           </div>
         </div>
       </div>
       <template #footer>
-        <div class="flex justify-end"><PPButton weight="quiet" @click="previewOpen = false">{{ t('common.close') }}</PPButton></div>
+        <div class="flex justify-end">
+          <PPButton weight="quiet" @click="previewOpen = false">
+            {{ t('common.close') }}
+          </PPButton>
+        </div>
       </template>
     </PPModal>
   </div>

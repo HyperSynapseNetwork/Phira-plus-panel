@@ -1,6 +1,6 @@
+import type { AuditEvent } from '~/features/audit/types'
 /** Panel domain types. Public wire overlap comes from frozen generated OpenAPI. */
 import type { GroupRef } from '~/types/generated'
-import type { AuditEvent } from '~/features/audit/types'
 
 // `ppb_user_id` (UUID) vs `phira_id` (Phira i32); avatar/username).
 // ---------------------------------------------------------------------------

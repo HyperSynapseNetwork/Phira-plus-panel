@@ -71,7 +71,7 @@ const { t } = usePanelI18n()
 <template>
   <section
     class="fixed z-[calc(var(--pp-z-desktop-window-base)+var(--pp-desktop-window-index))] flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-overlay"
-    :style="{ left: `${g.x}px`, top: `${g.y}px`, width: `${g.width}px`, height: `${g.height}px`, '--pp-desktop-window-index': layerIndex }"
+    :style="{ 'left': `${g.x}px`, 'top': `${g.y}px`, 'width': `${g.width}px`, 'height': `${g.height}px`, '--pp-desktop-window-index': layerIndex }"
     role="dialog"
     :aria-label="title"
     @pointerdown="emit('focus')"

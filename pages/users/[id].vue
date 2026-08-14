@@ -12,8 +12,8 @@ import PPTabs from '~/components/ui/PPTabs.vue'
 import { useAsync } from '~/composables/useAsync'
 import { useReauth } from '~/composables/useReauth'
 import { USER_ACTION } from '~/config/action-ids'
-import { usePermissionsStore } from '~/stores/permissions'
 import { userStatusLabel } from '~/features/users/labels'
+import { usePermissionsStore } from '~/stores/permissions'
 import { formatDateTime, formatDuration } from '~/utils/format'
 
 definePageMeta({ permissions: ['user:view'] })
@@ -41,14 +41,14 @@ const sessions = useAsync(() => fetchUserSessions(phiraId.value), { immediate: f
 const security = useAsync(() => fetchUserSecurity(phiraId.value), { immediate: false })
 const audit = useAsync(() => fetchUserAudit(phiraId.value, { pageNum: 50 }), { immediate: false })
 
-watch(tab, (t) => {
-  if (t === 'multiplayer' && !multiplayer.ready.value)
+watch(tab, (nextTab) => {
+  if (nextTab === 'multiplayer' && !multiplayer.ready.value)
     void multiplayer.run()
-  if (t === 'sessions' && !sessions.ready.value)
+  if (nextTab === 'sessions' && !sessions.ready.value)
     void sessions.run()
-  if (t === 'security' && !security.ready.value)
+  if (nextTab === 'security' && !security.ready.value)
     void security.run()
-  if (t === 'audit' && !audit.ready.value)
+  if (nextTab === 'audit' && !audit.ready.value)
     void audit.run()
 })
 
@@ -164,7 +164,9 @@ function auditRow(e: AuditEvent) {
       ]"
     />
 
-    <p v-if="validationMsg" class="mt-2 text-sm text-danger" role="alert">{{ validationMsg }}</p>
+    <p v-if="validationMsg" class="mt-2 text-sm text-danger" role="alert">
+      {{ validationMsg }}
+    </p>
 
     <!-- Overview -->
     <div v-if="tab === 'overview'" class="mt-4 space-y-4">

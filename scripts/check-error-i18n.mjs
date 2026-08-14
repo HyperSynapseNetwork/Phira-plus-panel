@@ -39,14 +39,18 @@ for (const lang of ['zh', 'en']) {
 const skipped = new Set(['node_modules', '.nuxt', '.output', 'dist', '.git', 'coverage', 'generated.ts', 'scripts', 'tests', 'contracts'])
 const allowedFiles = new Set(['utils/api/errors.ts', 'utils/api-error.ts'])
 function walk(dir) {
-  if (!fs.existsSync(dir)) return
+  if (!fs.existsSync(dir))
+    return
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (skipped.has(entry.name)) continue
+    if (skipped.has(entry.name))
+      continue
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) { walk(full); continue }
-    if (!/\.(vue|ts|tsx|js|mjs)$/.test(entry.name)) continue
+    if (!/\.(vue|ts|tsx|js|mjs)$/.test(entry.name))
+      continue
     const rel = path.relative(root, full).replaceAll('\\', '/')
-    if ([...allowedFiles].some(suffix => rel.endsWith(suffix))) continue
+    if ([...allowedFiles].some(suffix => rel.endsWith(suffix)))
+      continue
     const text = fs.readFileSync(full, 'utf8')
     // Formal UI may not render raw backend Error.message. Internal logging/tests are excluded by source scope.
     if (/\b(?:err|error)\.message\b/.test(text)) {
