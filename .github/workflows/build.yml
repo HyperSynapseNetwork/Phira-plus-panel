@@ -12,6 +12,11 @@ on:
 permissions:
   contents: read
 
+# Official CI chooses its endpoint explicitly. Self-host builds must inject the
+# deployment's PPB URL and fail fast if it is omitted.
+env:
+  NUXT_PUBLIC_API_BASE: https://api-phira.htadiy.com
+
 jobs:
   build:
     name: Lint · contract · typecheck · test · build · noindex
@@ -43,6 +48,19 @@ jobs:
       # call so contract drift is caught at CI time.
       - name: Contract consistency
         run: node scripts/check-contract-consistency.mjs
+      - name: Current documentation truthfulness
+        run: python3 scripts/check-current-docs.py
+
+      - name: Frontend Design Contract gate
+        run: pnpm test:design-contract
+
+      - name: Error locale completeness gate
+        run: pnpm test:error-i18n
+      - name: Product copy / accessibility i18n gate
+        run: pnpm test:product-copy
+      - name: Runtime template semantics gate
+        run: pnpm test:runtime-semantics
+
 
       - name: Typecheck (vue-tsc)
         run: pnpm vue-tsc

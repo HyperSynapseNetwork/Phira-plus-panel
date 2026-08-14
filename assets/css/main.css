@@ -61,10 +61,55 @@ textarea:focus-visible,
 
 /* --- Reduced transparency (best-effort; Chromium 118+) --- */
 @media (prefers-reduced-transparency: reduce) {
-  *,
-  *::before,
-  *::after {
-    backdrop-filter: none !important;
-    opacity: 1 !important;
+  :root {
+    --pp-material-blur: 0px;
+    --pp-material-thin: var(--pp-surface-1);
+    --pp-material-regular: var(--pp-surface-1);
+    --pp-material-thick: var(--pp-surface-0);
   }
+  [class*="backdrop-blur"], .pp-notice-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+/* PPNotice — short-lived operation feedback; distinct from persistent Notification Hub. */
+.pp-notice-enter-active,
+.pp-notice-leave-active,
+.pp-notice-move {
+  transition: opacity 240ms cubic-bezier(.22,1,.36,1), transform 240ms cubic-bezier(.22,1,.36,1);
+}
+.pp-notice-enter-from,
+.pp-notice-leave-to { opacity: 0; transform: translateY(-8px); }
+@media (min-width: 640px) {
+  .pp-notice-enter-from,
+  .pp-notice-leave-to { transform: translateX(12px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-notice-enter-active,
+  .pp-notice-leave-active,
+  .pp-notice-move { transition-duration: 1ms; transform: none; }
+  .pp-notice-enter-from,
+  .pp-notice-leave-to { transform: none; }
+  .pp-notice-enter-active .animate-spin { animation: none !important; }
+}
+.sidebar-section-enter-active,.sidebar-section-leave-active{transition:opacity 200ms ease,transform 200ms ease}
+.sidebar-section-enter-from,.sidebar-section-leave-to{opacity:0;transform:translateY(-4px)}
+@media (prefers-reduced-motion: reduce){.sidebar-section-enter-active,.sidebar-section-leave-active{transition-duration:1ms}.sidebar-section-enter-from,.sidebar-section-leave-to{transform:none}}
+
+[data-reduced-motion="true"] *,[data-reduced-motion="true"] *::before,[data-reduced-motion="true"] *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+[data-reduced-transparency="true"] [class*="backdrop-blur"],[data-reduced-transparency="true"] .pp-notice-card{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+
+@media (pointer: coarse) {
+  .pp-touch-target { min-height: 44px !important; min-width: 44px !important; }
+}
+:root[data-reduced-transparency="true"] {
+  --pp-material-blur: 0px;
+  --pp-material-thin: var(--pp-surface-1);
+  --pp-material-regular: var(--pp-surface-1);
+  --pp-material-thick: var(--pp-surface-0);
+}
+
+@media (pointer: coarse) {
+  .pp-desktop-window-header { min-height: 44px; }
 }

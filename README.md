@@ -16,7 +16,7 @@
 
 > [!IMPORTANT]
 > **Phira+ 三件套之一**：`ppb`（Phira-plus-Backend，后端）· `ppf`（Phira-plus-frontend，公开伴生站）· `panel`（本仓库，管理控制台）。
-> **跨仓冻结契约见 [`contracts/README.md`](../contracts/README.md)（Contract-Freeze v0）** —— 先改契约，再实现；禁止三边猜字段。
+> **跨仓冻结契约以三仓工作区的 `contracts/README.md`（Contract-Freeze v0）与 [契约一致性脚本](scripts/check-contract-consistency.mjs) 为准** —— 先改契约，再实现；禁止三边猜字段。
 > 本仓库采用 **Apache License, Version 2.0**，详见 [LICENSE](LICENSE)。
 
 > [!TIP]
@@ -28,12 +28,12 @@
 
 ### 核心特性
 
-- **纯 SPA + 全站 noindex**：`ssr:false`，无 SSR/SSG/sitemap；`X-Robots-Tag: noindex,nofollow,noarchive,nosnippet,noimageindex`（Nitro 中间件 + route rules 双保险）覆盖每个路由含 fallback/404；`public/robots.txt` → `Disallow: /`；回归测试 `tests/noindex.spec.ts`
+- **纯静态 SPA + 全站 noindex**：`ssr:false`，无运行时 Nitro/sitemap；反代模板为所有路由和 fallback 输出 `X-Robots-Tag`，HTML 与 `robots.txt` 提供第二、第三层防线。
 - **Root 登录**：`/login` POST `/api/v1/admin/auth/root/login`（`{password}` → `{principal_type, must_change_password}`）；首次登录强改密走 `/change-password`；`stores/auth.ts` 管理会话状态
 - **权限驱动的导航**：`config/admin-navigation.ts` 声明每项所需最小权限 id，侧栏按 `hasPermission` 过滤；权威 Permission Manifest 始终来自 PPB（`GET /api/v1/admin/permissions/manifest`），前端不硬编码全集
-- **管理功能页**：仪表盘 / 用户 / 用户组 / 房间 / 服务器 / 配置 / 插件 / 日志 / 控制台 / 审计 / 任务 / 通知 / 优惠券 / 自动化 / 面板偏好（每页在 PPB 端点未就绪时优雅降级）
+- **管理功能页**：仪表盘 / 用户 / 用户组 / 房间 / 服务器 / 配置 / 插件 / 日志 / 控制台 / 审计 / 任务 / 通知 / 兑换码 / 自动化 / 面板偏好（每页在 PPB 端点未就绪时优雅降级）
 - **统一 API 客户端**：`types/api.ts`（错误信封 / 分页 / meta）、`utils/api-error.ts`（`ApiError` + `normalizeFetchError`）、`composables/useApi.ts`（credentialed CORS 到 `NUXT_PUBLIC_API_BASE`）
-- **面板偏好**：`stores/preferences.ts` + `types/preferences.ts`，命名空间 `panel`，JSONB + revision 乐观并发保存到 `/me/preferences/panel`（Phase A 内存态，绝不 localStorage-only）
+- **面板偏好**：`stores/preferences.ts` + `types/preferences.ts`，命名空间 `panel`，JSONB + revision 乐观并发保存到 `/me/preferences/panel`（服务端 JSONB + revision 持久化；local storage 仅可承载明确的 device-scoped 偏好）
 
 ## 文档
 
@@ -75,11 +75,11 @@ pnpm dev
 pnpm lint          # ESLint（@antfu/eslint-config）
 pnpm vue-tsc       # Nuxt prepare + vue-tsc --noEmit
 pnpm test          # Vitest 单元/组件测试
-pnpm build         # Nuxt SPA 构建 → .output/server + .output/public
+pnpm generate      # Nuxt SPA 静态构建 → .output/public
 pnpm test:noindex  # 对构建产物的 noindex 回归检查
 ```
 
-`.env.example` → `.env`，默认连 `https://api-phira.htadiy.com`（PPB）。
+`.env.example` → `.env`，显式设置目标 PPB；缺失时构建会 fail-fast，避免自部署误连官方服务。
 
 ## 首次使用（Root 登录）
 
@@ -93,4 +93,3 @@ pnpm test:noindex  # 对构建产物的 noindex 回归检查
 ## 许可证
 
 Phira+ Panel 采用 **Apache License, Version 2.0** — 详见 [LICENSE](LICENSE)。
-

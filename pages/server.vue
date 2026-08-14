@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Job } from '~/types/admin'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import {
   cancelJob,
   createJob,
@@ -13,26 +13,30 @@ import {
   runServerAction,
 } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
-import KpiCard from '~/components/admin/KpiCard.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
 import ReauthModal from '~/components/admin/ReauthModal.vue'
-import UBadge from '~/components/ui/UBadge.vue'
-import UButton from '~/components/ui/UButton.vue'
-import UCard from '~/components/ui/UCard.vue'
-import UModal from '~/components/ui/UModal.vue'
-import USwitch from '~/components/ui/USwitch.vue'
+import PPBadge from '~/components/ui/PPBadge.vue'
+import PPStatus from '~/components/ui/PPStatus.vue'
+import PPButton from '~/components/ui/PPButton.vue'
+import PPSection from '~/components/patterns/PPSection.vue'
+import PPInput from '~/components/ui/PPInput.vue'
+import PPModal from '~/components/ui/PPModal.vue'
+import PPSwitch from '~/components/ui/PPSwitch.vue'
 import { useAsync } from '~/composables/useAsync'
 import { useReauth } from '~/composables/useReauth'
 import { SERVER_ACTION, UPDATE_JOB } from '~/config/action-ids'
 import { useAuthStore } from '~/stores/auth'
-import { ApiError } from '~/utils/api-error'
+import { jobStageLabel, jobTypeLabel } from '~/features/jobs/labels'
 import { formatDuration, formatNumber } from '~/utils/format'
 
 definePageMeta({ permissions: ['server:view'] })
 
 const reauth = useReauth()
 const auth = useAuthStore()
+const { t } = usePanelI18n()
 const canRetry = computed(() => auth.hasPermission(['server:update']))
+const canStart = computed(() => auth.hasPermission(['server:start']))
+const canShutdown = computed(() => auth.hasPermission(['server:shutdown']))
 
 // §23 #6: compose four typed endpoints instead of one giant status.
 const status = useAsync(() => fetchServerStatus())
@@ -42,8 +46,35 @@ const gates = useAsync(() => fetchServerGates())
 const jobs = useAsync(() => fetchJobs({ pageNum: 100 }))
 
 const busy = ref(false)
-const msg = ref('')
+const notice = useNotice()
 const confirmShutdown = ref(false)
+const confirmSupervisorStop = ref(false)
+const startModal = ref(false)
+const startupValues = reactive<Record<string, string | number | boolean>>({})
+
+const deployment = computed(() => status.data.value?.deployment)
+const startupSpecs = computed(() => deployment.value?.startup_args ?? [])
+
+function openStartModal() {
+  for (const key of Object.keys(startupValues)) delete startupValues[key]
+  for (const spec of startupSpecs.value) {
+    if (spec.kind === 'boolean') startupValues[spec.key] = false
+    else if (spec.allowed_values?.length) startupValues[spec.key] = spec.allowed_values[0] ?? ''
+    else startupValues[spec.key] = ''
+  }
+  startModal.value = true
+}
+
+function buildStartupArgs(): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const spec of startupSpecs.value) {
+    const raw = startupValues[spec.key]
+    if (spec.kind === 'boolean') { out[spec.key] = Boolean(raw); continue }
+    if (raw === '' || raw == null) continue
+    out[spec.key] = spec.kind === 'integer' ? Number(raw) : String(raw)
+  }
+  return out
+}
 
 // ---------------------------------------------------------------------------
 // PMP update via Job API (P0-1, design §9.4 / §23 #7 honest stage)
@@ -63,27 +94,27 @@ const updateActive = computed(() =>
  * backend cancel is a no-op, so the button is hidden instead of misleading.
  */
 const updateCancellable = computed(() => updateJob.value?.state === 'queued')
-const updateTone = computed<'neutral' | 'success' | 'warning' | 'danger'>(() => {
+const updateTone = computed<'neutral' | 'success' | 'warning' | 'error' | 'live'>(() => {
   const s = updateJob.value?.state
-  return s === 'succeeded' ? 'success' : s === 'failed' ? 'danger' : s === 'cancelled' ? 'neutral' : 'warning'
+  return s === 'succeeded' ? 'success' : s === 'failed' ? 'error' : s === 'cancelled' ? 'neutral' : s === 'running' ? 'live' : 'warning'
 })
 const updateLabel = computed(() => {
   const j = updateJob.value
   if (!j)
-    return '空闲'
+    return t('server.idle')
   switch (j.state) {
     case 'queued':
-      return '排队中…'
+      return t('server.queued')
     case 'running':
       return j.stage === 'executing_pmp_update'
-        ? '应用更新中…'
-        : j.stage === 'checking' ? '检查更新中…' : (j.stage || '运行中…')
+        ? t('server.applying')
+        : j.stage === 'checking' ? t('server.checking') : (j.stage || t('server.running'))
     case 'succeeded':
-      return j.stage === 'checked' ? '已是最新版本' : '更新完成'
+      return j.stage === 'checked' ? t('server.upToDate') : t('server.updateDone')
     case 'failed':
-      return j.stage === 'timeout' ? '更新超时' : '更新失败'
+      return j.stage === 'timeout' ? t('server.updateTimeout') : t('server.updateFailed')
     case 'cancelled':
-      return '已取消'
+      return t('server.cancelled')
     default:
       return j.state
   }
@@ -124,15 +155,14 @@ watch(updateActive, (active) => {
 onBeforeUnmount(stopPolling)
 
 async function createUpdateJob(type: string, reauthToken?: string) {
-  msg.value = ''
   busy.value = true
   try {
     await createJob(type, {}, reauthToken)
-    msg.value = `已提交 ${type} 任务`
+    notice.success('notice.jobCreated', { dedupKey: `server:job:${type}` })
     await jobs.run()
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '提交失败'
+    notice.errorFromApi(err, { dedupKey: `server:job:${type}:error` })
   }
   finally {
     busy.value = false
@@ -150,15 +180,14 @@ async function doCancelUpdate() {
   const j = updateJob.value
   if (!j)
     return
-  msg.value = ''
   busy.value = true
   try {
     await cancelJob(j.id)
-    msg.value = '已请求取消'
+    notice.success('notice.cancelled', { dedupKey: `server:job:${j.id}:cancel` })
     await jobs.run()
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '取消失败'
+    notice.errorFromApi(err, { dedupKey: `server:job:${j.id}:cancel:error` })
   }
   finally {
     busy.value = false
@@ -169,15 +198,14 @@ async function doRetryUpdate() {
   const j = updateJob.value
   if (!j)
     return
-  msg.value = ''
   busy.value = true
   try {
     await retryJob(j.id)
-    msg.value = '已重新入队'
+    notice.success('notice.retried', { dedupKey: `server:job:${j.id}:retry` })
     await jobs.run()
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '重试失败'
+    notice.errorFromApi(err, { dedupKey: `server:job:${j.id}:retry:error` })
   }
   finally {
     busy.value = false
@@ -188,30 +216,28 @@ async function doRetryUpdate() {
 // Server actions (gates / config reload / shutdown)
 // ---------------------------------------------------------------------------
 async function act(action: Parameters<typeof runServerAction>[0], args: Record<string, unknown> = {}, reauthToken?: string) {
-  msg.value = ''
   busy.value = true
   try {
     await runServerAction(action, args, reauthToken)
-    msg.value = `操作 ${action} 已提交`
+    notice.success('notice.actionCompleted', { dedupKey: `server:action:${action}` })
     if (action === SERVER_ACTION.setConnections || action === SERVER_ACTION.setRoomCreation)
       void gates.run()
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '操作失败'
+    notice.errorFromApi(err, { dedupKey: `server:action:${action}:error` })
   }
   finally {
     busy.value = false
   }
 }
 
-// §23 #10: only shutdown needs reauth among the remaining server actions.
-const REAUTH_SERVER_ACTIONS = new Set<string>([SERVER_ACTION.shutdown])
+const CRITICAL_SERVER_ACTIONS = new Set<string>([SERVER_ACTION.shutdown, SERVER_ACTION.start, SERVER_ACTION.supervisorStop])
 
 function dispatchServerAction(action: Parameters<typeof runServerAction>[0], args: Record<string, unknown> = {}) {
-  if (REAUTH_SERVER_ACTIONS.has(action)) {
+  if (CRITICAL_SERVER_ACTIONS.has(action)) {
     reauth.requireReauth(async (token) => {
       await act(action, args, token)
-    })
+    }, 'critical')
   }
   else {
     void act(action, args)
@@ -221,6 +247,29 @@ function dispatchServerAction(action: Parameters<typeof runServerAction>[0], arg
 function doShutdown() {
   confirmShutdown.value = false
   dispatchServerAction(SERVER_ACTION.shutdown, { reason: 'admin' })
+}
+function doSupervisorStop() {
+  confirmSupervisorStop.value = false
+  dispatchServerAction(SERVER_ACTION.supervisorStop, { reason: 'admin_fallback' })
+}
+function doStart() {
+  startModal.value = false
+  dispatchServerAction(SERVER_ACTION.start, buildStartupArgs())
+}
+
+function createBackupJob() {
+  reauth.requireReauth(async (token) => {
+    busy.value = true
+    try {
+      await createJob('backup', {}, token)
+      notice.success('notice.jobCreated', { dedupKey: 'server:backup' })
+      await jobs.run()
+    }
+    catch (err) {
+      notice.errorFromApi(err, { dedupKey: 'server:backup:error' })
+    }
+    finally { busy.value = false }
+  }, 'high')
 }
 
 // Runtime payload is dynamic (P-90); render top-level entries verbatim.
@@ -237,38 +286,34 @@ const runtimeEntries = computed(() => {
 
 <template>
   <div class="space-y-4">
-    <PageHeader title="服务器" subtitle="PMP / PPB 状态 · 运行时诊断 · 门控 · 更新（Job API）">
+    <PageHeader :title="t('server.title')" :subtitle="t('server.subtitle')">
       <template #actions>
-        <UButton variant="danger" size="sm" @click="confirmShutdown = true">
-          关闭服务器
-        </UButton>
+        <PPButton weight="dangerous" size="sm" @click="confirmShutdown = true">
+          {{ t('server.shutdown') }}
+        </PPButton>
       </template>
     </PageHeader>
 
-    <p v-if="msg" class="text-sm text-accent" role="status">
-      {{ msg }}
-    </p>
-
-    <!-- Status / stats KPI -->
-    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <KpiCard
-        label="PMP"
-        :value="status.data.value?.pmp.connected ? '已连接' : '未连接'"
-        :tone="status.data.value?.pmp.connected ? 'success' : 'danger'"
-        :hint="`v${status.data.value?.pmp.version ?? '—'}`"
-      />
-      <KpiCard label="PPB" :value="status.data.value?.ppb_version ?? '—'" hint="后端版本" />
-      <KpiCard label="在线用户" :value="formatNumber(stats.data.value?.users_online)" hint="PMP 在线" />
-      <KpiCard label="活动房间" :value="formatNumber(stats.data.value?.active_rooms)" hint="PMP 房间" />
+    <!-- Compact status band: scan first, drill into diagnostics below. -->
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-border py-3 text-sm">
+      <span class="inline-flex items-center gap-2">
+        <span class="h-2 w-2 rounded-full" :class="status.data.value?.pmp.connected ? 'bg-success' : 'bg-danger'" />
+        <strong class="font-medium text-foreground">PMP</strong>
+        <span class="text-muted">{{ status.data.value?.pmp.connected ? t('server.connected') : t('server.disconnected') }}</span>
+        <span v-if="status.data.value?.pmp.version" class="font-mono text-xs text-muted">v{{ status.data.value.pmp.version }}</span>
+      </span>
+      <span><strong class="font-medium text-foreground">PPB</strong><span v-if="status.data.value?.ppb_version" class="ml-1 text-muted">{{ status.data.value.ppb_version }}</span></span>
+      <span><strong class="font-medium text-foreground">{{ formatNumber(stats.data.value?.users_online) }}</strong> <span class="ml-1 text-muted">{{ t('server.onlineUsers') }}</span></span>
+      <span><strong class="font-medium text-foreground">{{ formatNumber(stats.data.value?.active_rooms) }}</strong> <span class="ml-1 text-muted">{{ t('server.activeRooms') }}</span></span>
     </div>
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <AsyncState :loading="stats.loading.value" :error="stats.error.value" :empty="false">
-        <UCard title="服务器统计" subtitle="PMP typed stats（§23 #6）">
+        <PPSection :title="t('server.stats')" :subtitle="t('server.statsSource')">
           <dl class="grid grid-cols-2 gap-3 text-sm">
             <div>
               <dt class="text-xs text-muted">
-                会话
+                {{ t('server.sessions') }}
               </dt>
               <dd class="text-foreground">
                 {{ formatNumber(stats.data.value?.active_sessions) }}
@@ -276,7 +321,7 @@ const runtimeEntries = computed(() => {
             </div>
             <div>
               <dt class="text-xs text-muted">
-                已加载插件
+                {{ t('server.loadedPlugins') }}
               </dt>
               <dd class="text-foreground">
                 {{ formatNumber(stats.data.value?.loaded_plugins) }}
@@ -284,7 +329,7 @@ const runtimeEntries = computed(() => {
             </div>
             <div>
               <dt class="text-xs text-muted">
-                运行时长
+                {{ t('server.uptime') }}
               </dt>
               <dd class="text-foreground">
                 {{ formatDuration(stats.data.value?.uptime_secs) }}
@@ -292,26 +337,26 @@ const runtimeEntries = computed(() => {
             </div>
             <div>
               <dt class="text-xs text-muted">
-                端口
+                {{ t('server.port') }}
               </dt>
               <dd class="text-foreground">
-                {{ stats.data.value?.port ?? '—' }} / {{ stats.data.value?.http_port ?? '—' }}
+                {{ stats.data.value?.port ?? t('common.unknown') }} / {{ stats.data.value?.http_port ?? t('common.unknown') }}
               </dd>
             </div>
             <div class="col-span-2">
               <dt class="text-xs text-muted">
-                服务器名
+                {{ t('server.serverName') }}
               </dt>
               <dd class="text-foreground">
-                {{ stats.data.value?.server_name || '—' }}
+                {{ stats.data.value?.server_name || t('common.unknown') }}
               </dd>
             </div>
           </dl>
-        </UCard>
+        </PPSection>
       </AsyncState>
 
-      <AsyncState :loading="runtime.loading.value" :error="runtime.error.value" :empty="runtimeEntries.length === 0" empty-text="runtime.status 无数据">
-        <UCard title="运行时诊断" subtitle="PMP runtime.status（动态 JSON，P-90）">
+      <AsyncState :loading="runtime.loading.value" :error="runtime.error.value" :empty="runtimeEntries.length === 0" :empty-text="t('server.runtimeEmpty')">
+        <PPSection :title="t('server.runtime')" :subtitle="t('server.runtimeSubtitle')">
           <dl v-if="runtimeEntries.length" class="grid grid-cols-2 gap-3 text-sm">
             <div v-for="e in runtimeEntries" :key="e.key">
               <dt class="text-xs text-muted">
@@ -322,112 +367,130 @@ const runtimeEntries = computed(() => {
               </dd>
             </div>
           </dl>
-        </UCard>
+        </PPSection>
       </AsyncState>
     </div>
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <AsyncState :loading="gates.loading.value" :error="gates.error.value" :empty="false">
-        <UCard title="连接与创建门控">
+        <PPSection :title="t('server.gates')">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <span class="text-sm text-foreground">连接门控</span>
-              <USwitch
+              <span class="text-sm text-foreground">{{ t('server.connectionGate') }}</span>
+              <PPSwitch
                 :model-value="gates.data.value?.connections ?? false"
                 :disabled="busy"
                 @update:model-value="v => act(SERVER_ACTION.setConnections, { enabled: v })"
               />
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-sm text-foreground">房间创建</span>
-              <USwitch
+              <span class="text-sm text-foreground">{{ t('server.roomCreation') }}</span>
+              <PPSwitch
                 :model-value="gates.data.value?.room_creation ?? false"
                 :disabled="busy"
                 @update:model-value="v => act(SERVER_ACTION.setRoomCreation, { enabled: v })"
               />
             </div>
           </div>
-        </UCard>
+        </PPSection>
       </AsyncState>
 
       <AsyncState :loading="jobs.loading.value" :error="jobs.error.value" :empty="false">
-        <UCard title="PMP 更新" subtitle="低带宽安全 · Job API（§9.4 / §23 #7 诚实 stage）">
+        <PPSection :title="t('server.update')" :subtitle="t('server.updateSubtitle')">
           <div class="flex flex-wrap items-center gap-3">
-            <UBadge :tone="updateTone">
+            <PPStatus :tone="updateTone">
               {{ updateLabel }}
-            </UBadge>
+            </PPStatus>
             <span v-if="updateJob" class="text-xs text-muted">
-              type={{ updateJob.type }} · stage={{ updateJob.stage || '—' }}
+              {{ jobTypeLabel(t, updateJob.type) }} · {{ jobStageLabel(t, updateJob.stage) }}
             </span>
             <span v-if="updateProgress != null" class="text-xs text-muted">
               {{ updateProgress }}%
             </span>
           </div>
           <p v-if="updateJob?.error" class="mt-2 text-sm text-danger">
-            {{ updateJob.error }}
+            {{ t('server.updateFailed') }}
           </p>
           <p v-if="updateJob?.state === 'succeeded' && updateJob.stage === 'checked'" class="mt-2 text-sm text-success">
-            已是最新版本，无需更新。
+            {{ t('server.alreadyLatest') }}
           </p>
           <div class="mt-3 flex flex-wrap gap-2">
-            <UButton size="sm" variant="outline" :disabled="busy || updateActive" @click="createUpdateJob(UPDATE_JOB.check)">
-              检查更新
-            </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy || updateActive" @click="dispatchUpdateApply">
-              应用更新
-            </UButton>
-            <UButton
+            <PPButton size="sm" weight="secondary" :disabled="busy || updateActive" @click="createUpdateJob(UPDATE_JOB.check)">
+              {{ t('server.checkUpdate') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" :disabled="busy || updateActive" @click="dispatchUpdateApply">
+              {{ t('server.applyUpdate') }}
+            </PPButton>
+            <PPButton
               v-if="updateCancellable"
               size="sm"
-              variant="outline"
+              weight="secondary"
               :disabled="busy"
               @click="doCancelUpdate"
             >
-              取消
-            </UButton>
-            <UButton
+              {{ t('common.cancel') }}
+            </PPButton>
+            <PPButton
               v-if="updateJob && (updateJob.state === 'failed' || updateJob.state === 'cancelled')"
               size="sm"
-              variant="outline"
+              weight="secondary"
               :disabled="busy || !canRetry"
               @click="doRetryUpdate"
             >
-              重试
-            </UButton>
+              {{ t('server.retry') }}
+            </PPButton>
           </div>
-        </UCard>
+        </PPSection>
       </AsyncState>
     </div>
 
-    <UCard title="维护与启动适配器">
+    <PPSection :title="t('server.maintenance')" :subtitle="t('server.maintenanceSubtitle')">
       <div class="flex flex-wrap gap-2">
-        <UButton size="sm" variant="outline" :disabled="busy" @click="act(SERVER_ACTION.configReload)">
-          重载配置
-        </UButton>
+        <PPButton size="sm" weight="secondary" :disabled="busy" @click="act(SERVER_ACTION.configReload)">{{ t('server.reloadConfig') }}</PPButton>
+        <PPButton v-if="deployment?.supervisor_start && canStart" size="sm" weight="primary" :disabled="busy || status.data.value?.pmp.connected" @click="openStartModal">{{ t('server.startMultiplayer') }}</PPButton>
+        <PPButton v-if="deployment?.supervisor_stop && canShutdown" size="sm" weight="secondary" :disabled="busy" @click="confirmSupervisorStop = true">{{ t('server.adapterStop') }}</PPButton>
+        <PPButton v-if="deployment?.backup && auth.hasPermission(['server:manage'])" size="sm" weight="secondary" :disabled="busy" @click="createBackupJob">{{ t('server.backup') }}</PPButton>
       </div>
-      <p class="mt-2 text-xs text-muted">
-        「从 Panel 启动 PMP」仅通过受控 Process Supervisor Adapter（固定 executable/service、allowlist 启动参数）——禁止任意 shell（§18.6 / §27.6）。当前部署 adapter 未配置时，此页面明确显示不支持。
-      </p>
-      <p class="mt-1 text-xs text-warning">
-        当前 adapter 未配置 —— 不支持从 Panel 启动。
-      </p>
-    </UCard>
+      <p class="mt-2 text-xs text-muted">{{ t('server.adapterHint') }}</p>
+      <p v-if="!deployment?.supervisor_start" class="mt-1 text-xs text-warning">{{ t('server.adapterMissing') }}</p>
+    </PPSection>
 
-    <UModal :open="confirmShutdown" title="确认关闭服务器" width="max-w-md" @close="confirmShutdown = false">
+    <PPModal :open="startModal" :title="t('server.startTitle')" width="max-w-lg" @close="startModal = false">
+      <div class="space-y-3">
+        <p class="text-sm text-muted">{{ t('server.startHint') }}</p>
+        <label v-for="spec in startupSpecs" :key="spec.key" class="block">
+          <span class="mb-1 block text-xs font-medium text-foreground">{{ spec.key }}<span v-if="spec.required" class="text-danger"> *</span></span>
+          <PPSwitch v-if="spec.kind === 'boolean'" :model-value="Boolean(startupValues[spec.key])" @update:model-value="v => startupValues[spec.key] = v" />
+          <PPSelect v-else-if="spec.allowed_values?.length" v-model="startupValues[spec.key]">
+            <option v-for="value in spec.allowed_values" :key="String(value)" :value="String(value)">{{ value }}</option>
+          </PPSelect>
+          <PPInput v-else v-model="startupValues[spec.key]" :type="spec.kind === 'integer' ? 'number' : 'text'" />
+        </label>
+        <p v-if="startupSpecs.length === 0" class="text-xs text-muted">{{ t('server.noStartupArgs') }}</p>
+      </div>
+      <template #footer><div class="flex justify-end gap-2"><PPButton weight="quiet" @click="startModal = false">{{ t('common.cancel') }}</PPButton><PPButton weight="primary" :disabled="busy" @click="doStart">{{ t('server.continueReauth') }}</PPButton></div></template>
+    </PPModal>
+
+    <PPModal :open="confirmSupervisorStop" :title="t('server.stopTitle')" width="max-w-md" @close="confirmSupervisorStop = false">
+      <p class="text-sm text-foreground">{{ t('server.stopHint') }}</p>
+      <template #footer><div class="flex justify-end gap-2"><PPButton weight="quiet" @click="confirmSupervisorStop = false">{{ t('common.cancel') }}</PPButton><PPButton weight="dangerous" :disabled="busy" @click="doSupervisorStop">{{ t('server.continueReauth') }}</PPButton></div></template>
+    </PPModal>
+
+    <PPModal :open="confirmShutdown" :title="t('server.shutdownTitle')" width="max-w-md" @close="confirmShutdown = false">
       <p class="text-sm text-foreground">
-        确认关闭 PMP 服务器？该操作会中断所有房间与在线玩家。
+        {{ t('server.shutdownHint') }}
       </p>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="confirmShutdown = false">
-            取消
-          </UButton>
-          <UButton variant="danger" :disabled="busy" @click="doShutdown">
-            确认关闭
-          </UButton>
+          <PPButton weight="quiet" @click="confirmShutdown = false">
+            {{ t('common.cancel') }}
+          </PPButton>
+          <PPButton weight="dangerous" :disabled="busy" @click="doShutdown">
+            {{ t('server.confirmShutdown') }}
+          </PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
 
     <ReauthModal
       :open="reauth.open.value"

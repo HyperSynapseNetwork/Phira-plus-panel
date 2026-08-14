@@ -58,6 +58,8 @@ const option = computed(() => {
 })
 
 const empty = computed(() => props.data.length === 0)
+
+const { t } = usePanelI18n()
 </script>
 
 <template>
@@ -67,28 +69,29 @@ const empty = computed(() => props.data.length === 0)
         {{ title }}
       </h3>
       <div class="flex items-center gap-1 text-[11px] text-muted">
-        <select
-          class="rounded border border-border bg-field px-1 py-0.5 text-[11px]"
-          :value="chartType"
-          aria-label="图表类型"
-          @change="setChartType(($event.target as HTMLSelectElement).value as ChartKind)"
+        <PPSelect
+          :model-value="chartType"
+          compact
+          class="w-24"
+          :aria-label="t('chartCard.type')"
+          @update:model-value="value => setChartType(value as ChartKind)"
         >
           <option value="line">
-            折线
+            {{ t('chartCard.line') }}
           </option>
           <option value="bar">
-            柱状
+            {{ t('chartCard.bar') }}
           </option>
           <option value="pie">
-            饼图
+            {{ t('chartCard.pie') }}
           </option>
-        </select>
+        </PPSelect>
         <span>{{ timeRange }}</span>
       </div>
     </header>
     <VChart v-if="!empty" class="h-48 w-full" :option="option" autoresize />
     <p v-else class="py-10 text-center text-sm text-muted">
-      暂无数据（PPB 未就绪或该时段无数据）
+      {{ t('chartCard.noData') }}
     </p>
   </section>
 </template>

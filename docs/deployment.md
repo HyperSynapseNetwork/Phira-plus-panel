@@ -1,26 +1,16 @@
 # 部署（Deployment）
 
-> Panel 是 Nuxt 3 SPA（`ssr:false`），部署即「构建 → 托管 Nitro server 或把 `.output/public` 丢给静态托管」。域名固定 `panel-phira.htadiy.com`（contract §11）。
+> Panel 是 Nuxt 3 纯静态 SPA（`ssr:false`）。构建后只托管 `.output/public`，并由反向代理统一处理深路由回退与 noindex 响应头。
 
 ## 构建
 
 ```bash
 pnpm install
-pnpm build      # → .output/（public HTML 壳 + server/index.mjs）
+pnpm generate   # → .output/public
 pnpm test:noindex  # 构建产物 noindex 回归
 ```
 
-## 方式 A：Nitro Server（推荐）
-
-`pnpm build` 产出的 Nitro server（`.output/server/index.mjs`）渲染 SPA HTML 壳并输出 `X-Robots-Tag`（middleware + route rules 双保险），由 Node 托管：
-
-```bash
-node .output/server/index.mjs
-```
-
-反代把 `panel-phira.htadiy.com` 转给该端口即可。这样 noindex 头由 Nitro 层保证。
-
-## 方式 B：纯静态托管（+ 反代补 noindex）
+## 静态托管
 
 把 `.output/public/` 上传到静态托管，所有未知路径回退到 `index.html`（SPA fallback）：
 
@@ -44,8 +34,7 @@ server {
 }
 ```
 
-> [!IMPORTANT]
-> 静态托管没有 Nitro，`routeRules` 与 middleware 都不生效。**反代必须**为 error / fallback / 登录页补 `X-Robots-Tag`，否则 noindex 契约被破坏（`tests/noindex.spec.ts` 只覆盖 Nitro 托管产物）。
+仓库中的 `deploy/nginx.conf` 与 `deploy/Caddyfile` 是权威模板。静态托管没有 Nitro，`routeRules` 不会生成生产响应头；反代必须为正常页、登录页和 fallback 统一添加 `X-Robots-Tag`。
 
 ## 安全与合规
 
@@ -58,5 +47,5 @@ server {
 
 ## 生产注意
 
-- `apiBase` 默认 `https://api-phira.htadiy.com`；自部署时用 `NUXT_PUBLIC_API_BASE` 覆盖并重新构建。
+- 构建时显式设置 `NUXT_PUBLIC_API_BASE`；自部署不得依赖官方 API 默认值。
 - Root 登录 / 首次改密依赖 PPB `/api/v1/admin/auth/root/*`，部署前确认 PPB 已就绪。

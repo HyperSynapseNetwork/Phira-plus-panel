@@ -19,6 +19,8 @@ function focus() {
     void router.push({ path: '/logs', query: { focus: props.logId } })
   }
 }
+
+const { t } = usePanelI18n()
 </script>
 
 <template>
@@ -32,13 +34,13 @@ function focus() {
       <span class="text-xs font-medium" :class="level === 'error' ? 'text-danger' : 'text-warning'">
         {{ level === 'error' ? 'ERROR' : 'WARN' }} · {{ errorCode }}
       </span>
-      <span class="text-[11px] text-muted">{{ count }} 次 · {{ lastSeenAgo }}</span>
+      <span class="text-[11px] text-muted">{{ t('alertCard.count', { count, time: lastSeenAgo }) }}</span>
     </div>
     <p class="mt-1 text-sm text-foreground">
       {{ message }}
     </p>
     <p v-if="logId" class="mt-1 text-[11px] text-muted">
-      查看最新一条 →
+      {{ t('alertCard.latest') }}
     </p>
   </button>
 </template>

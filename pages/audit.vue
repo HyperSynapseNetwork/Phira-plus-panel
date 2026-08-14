@@ -4,17 +4,20 @@ import { ref, watch } from 'vue'
 import { exportAuditCsv, fetchAudit } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
-import UBadge from '~/components/ui/UBadge.vue'
-import UButton from '~/components/ui/UButton.vue'
-import UInput from '~/components/ui/UInput.vue'
-import UModal from '~/components/ui/UModal.vue'
-import UPagination from '~/components/ui/UPagination.vue'
-import USelect from '~/components/ui/USelect.vue'
+import PPBadge from '~/components/ui/PPBadge.vue'
+import PPStatus from '~/components/ui/PPStatus.vue'
+import PPButton from '~/components/ui/PPButton.vue'
+import PPInput from '~/components/ui/PPInput.vue'
+import PPModal from '~/components/ui/PPModal.vue'
+import PPPagination from '~/components/ui/PPPagination.vue'
+import PPSelect from '~/components/ui/PPSelect.vue'
 import { useAsync } from '~/composables/useAsync'
-import { ApiError } from '~/utils/api-error'
+import { auditResultLabel } from '~/features/audit/labels'
 import { formatDateTime } from '~/utils/format'
 
 definePageMeta({ permissions: ['audit:view'] })
+
+const { t } = usePanelI18n()
 
 const action = ref('')
 const principalType = ref('')
@@ -39,10 +42,9 @@ watch([action, principalType, result, search], () => {
 watch(page, () => void list.run())
 
 const detail = ref<AuditEvent | null>(null)
-const exportMsg = ref('')
+const notice = useNotice()
 
 async function doExport() {
-  exportMsg.value = ''
   try {
     const csv = await exportAuditCsv({
       action: action.value || undefined,
@@ -57,69 +59,65 @@ async function doExport() {
     a.download = `audit-${Date.now()}.csv`
     a.click()
     URL.revokeObjectURL(url)
-    exportMsg.value = '已导出 CSV'
+    notice.success('notice.actionCompleted', { dedupKey: 'audit:export' })
   }
   catch (err) {
-    exportMsg.value = err instanceof ApiError ? err.message : '导出失败'
+    notice.errorFromApi(err, { dedupKey: 'audit:export:error' })
   }
 }
 
-const resultTone = (r: string) => (r === 'success' ? 'success' : r === 'denied' ? 'warning' : 'danger')
+const resultTone = (r: string) => (r === 'success' ? 'success' : r === 'denied' ? 'warning' : 'error')
 </script>
 
 <template>
   <div>
-    <PageHeader title="审计" subtitle="筛选 / 详情 / CSV 导出 · 90 天保留（§18.12）">
+    <PageHeader :title="t('auditPage.title')" :subtitle="t('auditPage.subtitle')">
       <template #actions>
-        <UButton size="sm" variant="outline" :disabled="list.loading.value" @click="doExport">
-          导出 CSV
-        </UButton>
+        <PPButton size="sm" weight="secondary" :disabled="list.loading.value" @click="doExport">
+          {{ t('auditPage.export') }}
+        </PPButton>
       </template>
     </PageHeader>
 
     <div class="mb-3 flex flex-wrap items-center gap-2">
-      <UInput v-model="search" placeholder="搜索 action / resource" class="w-64" />
-      <USelect
+      <PPInput v-model="search" :placeholder="t('auditPage.search')" class="w-64" />
+      <PPSelect
         v-model="principalType"
-        placeholder="主体类型"
+        :placeholder="t('auditPage.principalType')"
         :options="[
           { label: 'Root', value: 'root' },
           { label: 'User', value: 'user' },
         ]"
       />
-      <USelect
+      <PPSelect
         v-model="result"
-        placeholder="结果"
+        :placeholder="t('auditPage.result')"
         :options="[
-          { label: '成功', value: 'success' },
-          { label: '失败', value: 'failure' },
-          { label: '拒绝', value: 'denied' },
+          { label: t('auditPage.success'), value: 'success' },
+          { label: t('auditPage.failure'), value: 'failure' },
+          { label: t('auditPage.denied'), value: 'denied' },
         ]"
       />
     </div>
-
-    <p v-if="exportMsg" class="mb-2 text-sm text-accent">
-      {{ exportMsg }}
-    </p>
 
     <div class="overflow-x-auto rounded-lg border border-border bg-surface">
       <table class="w-full text-left text-sm">
         <thead>
           <tr class="border-b border-border text-xs uppercase text-muted">
             <th class="px-3 py-2 font-medium">
-              时间
+              {{ t('auditPage.time') }}
             </th>
             <th class="px-3 py-2 font-medium">
-              主体
+              {{ t('auditPage.principal') }}
             </th>
             <th class="px-3 py-2 font-medium">
-              动作
+              {{ t('auditPage.action') }}
             </th>
             <th class="px-3 py-2 font-medium">
-              资源
+              {{ t('auditPage.resource') }}
             </th>
             <th class="px-3 py-2 font-medium">
-              结果
+              {{ t('auditPage.result') }}
             </th>
             <th class="px-3 py-2 font-medium">
               IP
@@ -147,9 +145,9 @@ const resultTone = (r: string) => (r === 'success' ? 'success' : r === 'denied' 
                 {{ e.resource_type }}<span v-if="e.resource_id" class="font-mono text-xs">:{{ e.resource_id.slice(0, 8) }}</span>
               </td>
               <td class="px-3 py-2">
-                <UBadge :tone="resultTone(e.result)">
-                  {{ e.result }}
-                </UBadge>
+                <PPStatus :tone="resultTone(e.result)">
+                  {{ auditResultLabel(t, e.result) }}
+                </PPStatus>
               </td>
               <td class="px-3 py-2 font-mono text-xs text-muted">
                 {{ e.ip ?? '—' }}
@@ -160,10 +158,10 @@ const resultTone = (r: string) => (r === 'success' ? 'success' : r === 'denied' 
       </table>
     </div>
 
-    <UPagination v-model:page="page" :page-num="pageNum" :total="list.data.value?.total ?? 0" />
+    <PPPagination v-model:page="page" :page-num="pageNum" :total="list.data.value?.total ?? 0" />
 
     <!-- Detail modal -->
-    <UModal :open="!!detail" title="审计详情" width="max-w-2xl" @close="detail = null">
+    <PPModal :open="!!detail" :title="t('auditPage.detail')" width="max-w-2xl" @close="detail = null">
       <dl v-if="detail" class="space-y-2 text-sm">
         <div>
           <dt class="text-xs text-muted">
@@ -174,53 +172,53 @@ const resultTone = (r: string) => (r === 'success' ? 'success' : r === 'denied' 
         </div>
         <div>
           <dt class="text-xs text-muted">
-            时间
+            {{ t('auditPage.time') }}
           </dt><dd class="text-foreground">
             {{ formatDateTime(detail.occurred_at) }}
           </dd>
         </div>
         <div>
           <dt class="text-xs text-muted">
-            动作
+            {{ t('auditPage.action') }}
           </dt><dd class="font-mono text-foreground">
             {{ detail.action }}
           </dd>
         </div>
         <div>
           <dt class="text-xs text-muted">
-            资源
+            {{ t('auditPage.resource') }}
           </dt><dd class="text-foreground">
             {{ detail.resource_type }} / {{ detail.resource_id ?? '—' }}
           </dd>
         </div>
         <div>
           <dt class="text-xs text-muted">
-            结果
+            {{ t('auditPage.result') }}
           </dt><dd class="text-foreground">
-            {{ detail.result }}<span v-if="detail.error_code" class="ml-2 font-mono text-xs text-danger">{{ detail.error_code }}</span>
+            {{ auditResultLabel(t, detail.result) }}<span v-if="detail.error_code" class="ml-2 font-mono text-xs text-danger">{{ detail.error_code }}</span>
           </dd>
         </div>
         <div>
           <dt class="text-xs text-muted">
-            Request / Command
+            {{ t('auditPage.requestCommand') }}
           </dt><dd class="font-mono text-xs text-foreground">
             {{ detail.request_id ?? '—' }} / {{ detail.command_id ?? '—' }}
           </dd>
         </div>
         <div>
           <dt class="text-xs text-muted">
-            IP / UA
+            {{ t('auditPage.ipUa') }}
           </dt><dd class="font-mono text-xs text-foreground">
             {{ detail.ip ?? '—' }} · {{ detail.user_agent ?? '—' }}
           </dd>
         </div>
         <div>
           <dt class="text-xs text-muted">
-            参数（redacted）
+            {{ t('auditPage.parameters') }}
           </dt>
           <dd><pre class="mt-1 max-h-48 overflow-auto rounded bg-surface-secondary p-2 font-mono text-xs">{{ JSON.stringify(detail.parameters_redacted, null, 2) }}</pre></dd>
         </div>
       </dl>
-    </UModal>
+    </PPModal>
   </div>
 </template>

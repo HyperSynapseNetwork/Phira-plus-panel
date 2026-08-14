@@ -54,7 +54,7 @@ panel/
 | `/audit` | 审计（含 CSV 导出） |
 | `/jobs` | 任务 |
 | `/notifications` | 通知（send / delivery） |
-| `/coupons` | 优惠券（create / revoke） |
+| `/coupons` | 兑换码（发行 / 撤销） |
 | `/automation` | 自动化（runbooks / runs） |
 | `/preferences` | 面板偏好 |
 | `[...slug]` | SPA fallback（404 + noindex） |

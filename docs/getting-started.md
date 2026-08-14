@@ -6,7 +6,7 @@
 
 - Node ≥ 22
 - pnpm ≥ 11（仓库 `packageManager: pnpm@11.8.0`；pnpm 设置见 `pnpm-workspace.yaml`）
-- 可用的 PPB 实例（默认 `https://api-phira.htadiy.com`；PPB 未就绪时各页优雅降级）
+- 可用的 PPB 实例，并在 `.env` 中显式设置其 URL
 
 ## 安装与开发
 
@@ -26,7 +26,7 @@ pnpm dev
 pnpm lint          # ESLint（@antfu/eslint-config）
 pnpm vue-tsc       # Nuxt prepare + vue-tsc --noEmit
 pnpm test          # Vitest 单元/组件测试
-pnpm build         # Nuxt SPA 构建（.output/server + .output/public）
+pnpm generate      # Nuxt SPA 静态构建（.output/public）
 pnpm test:noindex  # 对构建产物做 noindex 回归检查
 ```
 
@@ -34,7 +34,7 @@ CI（[build.yml](../.github/workflows/build.yml)）按 `lint → vue-tsc → tes
 
 ## 构建产物
 
-- `pnpm build` 产出 `.output/`：SPA 的 HTML 壳（`public/`）+ Nitro server（`server/`，用于渲染 HTML 壳并输出 `X-Robots-Tag`）。
+- `pnpm generate` 产出 `.output/public` 静态 SPA；生产 noindex HTTP header 由反代模板添加。
 - **不生成 sitemap / robots.txt / OG 图**（`@nuxtjs/seo` 相关能力全部关闭）。
 - `public/robots.txt` 静态提供 `User-agent: * / Disallow: /`。
 
@@ -47,4 +47,4 @@ CI（[build.yml](../.github/workflows/build.yml)）按 `lint → vue-tsc → tes
 
 ## 本地配置
 
-复制 `.env.example` → `.env`。默认 `NUXT_PUBLIC_API_BASE=https://api-phira.htadiy.com`；本地联调可改为 `http://localhost:8000`（PPB 需在 `[cors] dev_origins` 中放行 `http://localhost:3000`）。完整变量表见 [configuration.md](./configuration.md)。
+复制 `.env.example` → `.env`，显式设置 `NUXT_PUBLIC_API_BASE`；本地联调可使用 `http://localhost:8000`（PPB 需在 `[cors] dev_origins` 中放行 `http://localhost:3000`）。缺失或 URL 非法时开发服务器与构建均直接失败。完整变量表见 [configuration.md](./configuration.md)。

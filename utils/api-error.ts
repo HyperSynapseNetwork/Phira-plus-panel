@@ -1,30 +1,17 @@
-import type { ApiErrorBody, ClientErrorCode } from '~/types/api'
+import type { ApiErrorBody, ApiErrorCode, SafeErrorParams } from '~/types/api'
 
-/**
- * Normalized API error. `code` is the frozen PPB error code when the server
- * returned a well-formed envelope; otherwise it is a client-local category
- * (see CLIENT_ERROR_CODES).
- */
 export class ApiError extends Error {
-  readonly code: string
+  readonly code: ApiErrorCode
   readonly requestId?: string
-  readonly details?: unknown
+  readonly details: { params: SafeErrorParams }
   readonly status?: number
 
-  constructor(
-    code: string,
-    message: string,
-    opts: {
-      requestId?: string
-      details?: unknown
-      status?: number
-    } = {},
-  ) {
+  constructor(code: ApiErrorCode, message: string, opts: { requestId?: string, details?: unknown, status?: number } = {}) {
     super(message)
     this.name = 'ApiError'
     this.code = code
     this.requestId = opts.requestId
-    this.details = opts.details
+    this.details = normalizeDetails(opts.details)
     this.status = opts.status
   }
 }
@@ -33,40 +20,85 @@ interface RawFetchError {
   statusCode?: number
   status?: number
   data?: unknown
+  response?: { status?: number, _data?: unknown }
   message?: string
 }
 
-function asClientErrorCode(status?: number): ClientErrorCode {
-  if (status == null || status >= 500)
-    return 'UNKNOWN_ERROR'
-  return 'NETWORK_ERROR'
+function isSafeScalar(value: unknown): value is string | number | boolean | null {
+  return value === null || ['string', 'number', 'boolean'].includes(typeof value)
+}
+
+function normalizeDetails(value: unknown): { params: SafeErrorParams } {
+  if (!value || typeof value !== 'object')
+    return { params: {} }
+  const raw = (value as Record<string, unknown>).params
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+    return { params: {} }
+  const params: SafeErrorParams = {}
+  for (const [key, entry] of Object.entries(raw)) {
+    if (isSafeScalar(entry))
+      params[key] = entry
+  }
+  return { params }
+}
+
+function asEnvelope(value: unknown): ApiErrorBody | null {
+  if (!value || typeof value !== 'object')
+    return null
+  const error = (value as { error?: unknown }).error
+  if (!error || typeof error !== 'object')
+    return null
+  const e = error as Record<string, unknown>
+  if (typeof e.code !== 'string' || !e.code.trim())
+    return null
+  if (typeof e.message !== 'string')
+    return null
+  if (typeof e.request_id !== 'string' || !e.request_id.trim())
+    return null
+  if (!e.details || typeof e.details !== 'object')
+    return null
+  return value as ApiErrorBody
 }
 
 /**
- * Normalize any thrown fetch error into an ApiError.
- * - Server envelopes `{error:{code,message,...}}` → code/message/request_id.
- * - Empty envelopes with an HTTP status → generic code + status.
- * - Network-level failures → NETWORK_ERROR.
+ * Strict transport classification:
+ * - no HTTP response => NETWORK_ERROR
+ * - HTTP response + frozen envelope => exact server code (future code preserved)
+ * - HTTP response + malformed/non-envelope body => INVALID_RESPONSE
  */
 export function normalizeFetchError(err: unknown): ApiError {
+  if (err instanceof ApiError)
+    return err
   const raw = (err ?? {}) as RawFetchError
-  const status = raw.statusCode ?? raw.status
-  const body = raw.data as ApiErrorBody | undefined
+  const status = raw.response?.status ?? raw.statusCode ?? raw.status
+  const body = raw.response?._data ?? raw.data
 
-  if (body?.error?.code) {
-    return new ApiError(body.error.code, body.error.message || '请求失败', {
-      requestId: body.error.request_id,
-      details: body.error.details,
-      status,
-    })
-  }
-
-  // A server responded but the body is not the frozen envelope.
   if (status != null) {
-    return new ApiError(asClientErrorCode(status), raw.message || `请求失败 (${status})`, {
-      status,
-    })
+    const envelope = asEnvelope(body)
+    if (envelope) {
+      return new ApiError(envelope.error.code, envelope.error.message, {
+        requestId: envelope.error.request_id,
+        details: envelope.error.details,
+        status,
+      })
+    }
+    return new ApiError('INVALID_RESPONSE', 'Invalid API error response', { status })
   }
 
-  return new ApiError('NETWORK_ERROR', raw.message || '无法连接 API 服务', { status })
+  return new ApiError('NETWORK_ERROR', raw.message || 'Network error')
+}
+
+export function errorI18nKey(error: unknown): string {
+  const normalized = normalizeFetchError(error)
+  if (['NETWORK_ERROR', 'INVALID_RESPONSE', 'UNKNOWN_ERROR'].includes(normalized.code))
+    return `errors.client.${normalized.code}`
+  return `errors.api.${normalized.code}`
+}
+
+export function localizePanelError(t: (key: string, params?: SafeErrorParams) => string, error: unknown): { message: string, requestId?: string } {
+  const normalized = normalizeFetchError(error)
+  const key = errorI18nKey(normalized)
+  const rendered = t(key, normalized.details.params)
+  const message = rendered === key ? t('errors.client.UNKNOWN_ERROR') : rendered
+  return { message, requestId: normalized.requestId }
 }

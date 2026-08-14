@@ -4,18 +4,22 @@ import { computed, ref } from 'vue'
 import { completeAdminTask, createCoupon, fetchAdminTasks, fetchCoupons, revokeCoupon } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
-import UBadge from '~/components/ui/UBadge.vue'
-import UButton from '~/components/ui/UButton.vue'
-import UInput from '~/components/ui/UInput.vue'
-import UModal from '~/components/ui/UModal.vue'
-import USelect from '~/components/ui/USelect.vue'
-import UTextarea from '~/components/ui/UTextarea.vue'
+import PPBadge from '~/components/ui/PPBadge.vue'
+import PPStatus from '~/components/ui/PPStatus.vue'
+import PPButton from '~/components/ui/PPButton.vue'
+import PPInput from '~/components/ui/PPInput.vue'
+import PPModal from '~/components/ui/PPModal.vue'
+import PPSelect from '~/components/ui/PPSelect.vue'
+import PPTextarea from '~/components/ui/PPTextarea.vue'
+import PPSurface from '~/components/ui/PPSurface.vue'
 import { useAsync } from '~/composables/useAsync'
 import { useAuthStore } from '~/stores/auth'
-import { ApiError } from '~/utils/api-error'
+import { redemptionActionTypeLabel, redemptionStatusLabel, redemptionTaskStatusLabel } from '~/features/redemption/labels'
 import { formatDateTime } from '~/utils/format'
 
 definePageMeta({ permissions: ['coupon:view'] })
+
+const { t } = usePanelI18n()
 
 const auth = useAuthStore()
 const canManageTasks = computed(() => auth.hasPermission(['coupon:manage']))
@@ -32,7 +36,8 @@ const form = ref<{ code: string, actionType: CouponActionType, holderMode: 'crea
   note: '',
 })
 const busy = ref(false)
-const msg = ref('')
+const notice = useNotice()
+const fieldError = ref('')
 
 const argsJson = computed({
   get: () => form.value.args,
@@ -41,13 +46,13 @@ const argsJson = computed({
 
 async function doCreate() {
   busy.value = true
-  msg.value = ''
+  fieldError.value = ''
   let parsed: Record<string, unknown> = {}
   try {
     parsed = JSON.parse(form.value.args || '{}') as Record<string, unknown>
   }
   catch {
-    msg.value = 'args 不是合法 JSON'
+    fieldError.value = t('redemptionPage.invalidJson')
     busy.value = false
     return
   }
@@ -59,12 +64,12 @@ async function doCreate() {
       args: parsed,
       note: form.value.note || undefined,
     })
-    msg.value = '优惠券已创建（兑换执行 Action，非仅标记 used）'
+    notice.success('notice.created', { dedupKey: 'redemption:create' })
     createOpen.value = false
     void coupons.run()
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '创建失败'
+    notice.errorFromApi(err, { dedupKey: 'redemption:create:error' })
   }
   finally {
     busy.value = false
@@ -74,48 +79,47 @@ async function doCreate() {
 async function doRevoke(id: string) {
   try {
     await revokeCoupon(id)
+    notice.success('notice.actionCompleted', { dedupKey: `redemption:${id}:revoke` })
     void coupons.run()
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '撤销失败'
+    notice.errorFromApi(err, { dedupKey: `redemption:${id}:revoke:error` })
   }
 }
 
 async function doComplete(id: string) {
   try {
     await completeAdminTask(id)
+    notice.success('notice.actionCompleted', { dedupKey: `redemption-task:${id}:complete` })
     void tasks.run()
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '操作失败'
+    notice.errorFromApi(err, { dedupKey: `redemption-task:${id}:complete:error` })
   }
 }
 
-const statusTone = (s: string) => (s === 'active' || s === 'completed' ? 'success' : s === 'revoked' ? 'warning' : 'danger')
+const statusTone = (s: string) => (s === 'active' || s === 'completed' ? 'success' : s === 'revoked' ? 'warning' : 'error')
 </script>
 
 <template>
   <div class="space-y-4">
-    <PageHeader title="优惠券 / 管理任务" subtitle="兑换必须执行 Action（§18.14）">
+    <PageHeader :title="t('redemptionPage.title')" :subtitle="t('redemptionPage.subtitle')">
       <template #actions>
-        <UButton size="sm" variant="primary" @click="createOpen = true">
-          创建优惠券
-        </UButton>
+        <PPButton size="sm" weight="primary" @click="createOpen = true">
+          {{ t('redemptionPage.create') }}
+        </PPButton>
       </template>
     </PageHeader>
+    <p v-if="fieldError" class="mb-2 text-sm text-danger" role="alert">{{ fieldError }}</p>
 
-    <p v-if="msg" class="text-sm text-accent" role="status">
-      {{ msg }}
-    </p>
-
-    <section class="rounded-lg border border-border bg-surface p-4">
+    <PPSurface padded>
       <div class="mb-2 flex items-center justify-between">
         <h3 class="text-sm font-medium text-foreground">
-          优惠券
+          {{ t('redemptionPage.codes') }}
         </h3>
-        <UButton size="sm" variant="outline" @click="coupons.run()">
-          刷新
-        </UButton>
+        <PPButton size="sm" weight="secondary" @click="coupons.run()">
+          {{ t('redemptionPage.refresh') }}
+        </PPButton>
       </div>
       <AsyncState :loading="coupons.loading.value" :error="coupons.error.value" :empty="(coupons.data.value?.items ?? []).length === 0">
         <table class="w-full text-left text-sm">
@@ -126,13 +130,13 @@ const statusTone = (s: string) => (s === 'active' || s === 'completed' ? 'succes
               </th><th class="px-2 py-1">
                 Action
               </th><th class="px-2 py-1">
-                模式
+                {{ t('redemptionPage.mode') }}
               </th><th class="px-2 py-1">
-                状态
+                {{ t('redemptionPage.state') }}
               </th><th class="px-2 py-1">
-                创建
+                {{ t('redemptionPage.created') }}
               </th><th class="px-2 py-1">
-                操作
+                {{ t('redemptionPage.actions') }}
               </th>
             </tr>
           </thead>
@@ -148,112 +152,112 @@ const statusTone = (s: string) => (s === 'active' || s === 'completed' ? 'succes
                 {{ c.holder_mode }}
               </td>
               <td class="px-2 py-1.5">
-                <UBadge :tone="statusTone(c.status)">
-                  {{ c.status }}
-                </UBadge>
+                <PPStatus :tone="statusTone(c.status)">
+                  {{ redemptionStatusLabel(t, c.status) }}
+                </PPStatus>
               </td>
               <td class="px-2 py-1.5 text-muted">
                 {{ formatDateTime(c.created_at) }}
               </td>
               <td class="px-2 py-1.5">
-                <UButton v-if="c.status === 'active'" size="sm" variant="danger" @click="doRevoke(c.id)">
-                  撤销
-                </UButton>
+                <PPButton v-if="c.status === 'active'" size="sm" weight="dangerous" @click="doRevoke(c.id)">
+                  {{ t('redemptionPage.revoke') }}
+                </PPButton>
               </td>
             </tr>
           </tbody>
         </table>
       </AsyncState>
-    </section>
+    </PPSurface>
 
-    <section class="rounded-lg border border-border bg-surface p-4">
+    <PPSurface padded>
       <div class="mb-2 flex items-center justify-between">
         <h3 class="text-sm font-medium text-foreground">
-          Admin Tasks（待处理 / 完成）
+          {{ t('redemptionPage.tasks') }}
         </h3>
-        <UButton size="sm" variant="outline" @click="tasks.run()">
-          刷新
-        </UButton>
+        <PPButton size="sm" weight="secondary" @click="tasks.run()">
+          {{ t('redemptionPage.refresh') }}
+        </PPButton>
       </div>
       <AsyncState :loading="tasks.loading.value" :error="tasks.error.value" :empty="(tasks.data.value?.items ?? []).length === 0">
         <table class="w-full text-left text-sm">
           <thead>
             <tr class="border-b border-border text-xs uppercase text-muted">
               <th class="px-2 py-1">
-                来源
+                {{ t('redemptionPage.source') }}
               </th><th class="px-2 py-1">
-                类型
+                {{ t('redemptionPage.type') }}
               </th><th class="px-2 py-1">
-                状态
+                {{ t('redemptionPage.state') }}
               </th><th class="px-2 py-1">
-                创建
+                {{ t('redemptionPage.created') }}
               </th><th class="px-2 py-1">
-                操作
+                {{ t('redemptionPage.actions') }}
               </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="t in tasks.data.value?.items ?? []" :key="t.id" class="border-b border-border last:border-0">
+            <tr v-for="task in tasks.data.value?.items ?? []" :key="task.id" class="border-b border-border last:border-0">
               <td class="px-2 py-1.5">
-                {{ t.source }}
+                {{ task.source }}
               </td>
               <td class="px-2 py-1.5">
-                {{ t.type }}
+                {{ redemptionActionTypeLabel(t, task.type) }}
               </td>
               <td class="px-2 py-1.5">
-                <UBadge :tone="statusTone(t.status)">
-                  {{ t.status }}
-                </UBadge>
+                <PPStatus :tone="statusTone(task.status)">
+                  {{ redemptionTaskStatusLabel(t, task.status) }}
+                </PPStatus>
               </td>
               <td class="px-2 py-1.5 text-muted">
-                {{ formatDateTime(t.created_at) }}
+                {{ formatDateTime(task.created_at) }}
               </td>
               <td class="px-2 py-1.5">
-                <UButton v-if="t.status === 'pending'" size="sm" variant="primary" :disabled="!canManageTasks" @click="doComplete(t.id)">
-                  完成
-                </UButton>
+                <PPButton v-if="task.status === 'pending'" size="sm" weight="primary" :disabled="!canManageTasks" @click="doComplete(task.id)">
+                  {{ t('redemptionPage.complete') }}
+                </PPButton>
               </td>
             </tr>
           </tbody>
         </table>
       </AsyncState>
-    </section>
+    </PPSurface>
 
     <!-- Create modal -->
-    <UModal :open="createOpen" title="创建优惠券" width="max-w-lg" @close="createOpen = false">
+    <PPModal :open="createOpen" :title="t('redemptionPage.createTitle')" width="max-w-lg" @close="createOpen = false">
       <div class="space-y-3">
-        <UInput v-model="form.code" label="Code（留空自动生成）" />
-        <USelect
+        <PPInput v-model="form.code" :label="t('redemptionPage.codeAuto')" />
+        <PPSelect
           v-model="form.actionType"
-          label="兑换 Action 类型"
+          :label="t('redemptionPage.actionType')"
           :options="[
-            { label: '解锁账户', value: 'account_unlock' },
-            { label: '账户角色', value: 'account_role' },
-            { label: '管理告警', value: 'admin_alert' },
-            { label: '自定义 Hook', value: 'custom_hook' },
+            { label: t('redemptionPage.accountUnlock'), value: 'account_unlock' },
+            { label: t('redemptionPage.accountRole'), value: 'account_role' },
+            { label: t('redemptionPage.adminAlert'), value: 'admin_alert' },
+            { label: t('redemptionPage.customHook'), value: 'custom_hook' },
           ]"
         />
-        <USelect
+        <PPSelect
           v-model="form.holderMode"
-          label="持有模式"
+          :label="t('redemptionPage.holderMode')"
           :options="[
             { label: 'Creator', value: 'creator' },
             { label: 'Manual', value: 'manual' },
           ]"
         />
-        <UTextarea v-model="argsJson" label="Action Args (JSON)" :rows="3" mono placeholder="{ &quot;group_id&quot;: &quot;...&quot; }" />
-        <UInput v-model="form.note" label="备注" />
+        <PPTextarea v-model="argsJson" :label="t('common.actionArgsJson')" :rows="3" mono placeholder="{ &quot;group_id&quot;: &quot;...&quot; }" />
+        <PPInput v-model="form.note" :label="t('redemptionPage.note')" />
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="createOpen = false">
-            取消
-          </UButton>
-          <UButton variant="primary" :disabled="busy" @click="doCreate">
-            创建
-          </UButton>
+          <PPButton weight="quiet" @click="createOpen = false">
+            {{ t('common.cancel') }}
+          </PPButton>
+          <PPButton weight="primary" :disabled="busy" @click="doCreate">
+            {{ t('redemptionPage.create') }}
+          </PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
   </div>
 </template>

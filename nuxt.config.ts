@@ -1,6 +1,18 @@
 import process from 'node:process'
 import tailwindcss from '@tailwindcss/vite'
 
+const apiBase = process.env.NUXT_PUBLIC_API_BASE?.trim()
+if (!apiBase)
+  throw new Error('NUXT_PUBLIC_API_BASE is required; refusing to build a Panel that could target the wrong deployment')
+try {
+  const parsed = new URL(apiBase)
+  if (!['http:', 'https:'].includes(parsed.protocol))
+    throw new Error('unsupported protocol')
+}
+catch {
+  throw new Error('NUXT_PUBLIC_API_BASE must be an absolute http(s) URL')
+}
+
 export default defineNuxtConfig({
   /**
    * Panel is a pure SPA admin/ops UI (design §3.3 / §26.4).
@@ -69,12 +81,12 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'https://api-phira.htadiy.com',
+      apiBase: apiBase.replace(/\/$/, ''),
     },
   },
 
-  // §23.2 #1 — belt-and-suspenders: declarative header on every route,
-  // reinforced by server/middleware/noindex.ts (covers SPA fallback + errors).
+  // Development/server previews receive the header here. Static production
+  // hosting must apply the same header using the checked-in proxy templates.
   routeRules: {
     '/**': {
       headers: {

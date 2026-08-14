@@ -6,24 +6,28 @@ import { fetchGroups, fetchUser, fetchUserAudit, fetchUserMultiplayer, fetchUser
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
 import ReauthModal from '~/components/admin/ReauthModal.vue'
-import UBadge from '~/components/ui/UBadge.vue'
-import UButton from '~/components/ui/UButton.vue'
-import UTabs from '~/components/ui/UTabs.vue'
+import PPBadge from '~/components/ui/PPBadge.vue'
+import PPButton from '~/components/ui/PPButton.vue'
+import PPTabs from '~/components/ui/PPTabs.vue'
 import { useAsync } from '~/composables/useAsync'
 import { useReauth } from '~/composables/useReauth'
 import { USER_ACTION } from '~/config/action-ids'
 import { usePermissionsStore } from '~/stores/permissions'
-import { ApiError } from '~/utils/api-error'
+import { userStatusLabel } from '~/features/users/labels'
 import { formatDateTime, formatDuration } from '~/utils/format'
 
 definePageMeta({ permissions: ['user:view'] })
+
+const { t } = usePanelI18n()
 
 const route = useRoute()
 // Route id is the Phira id (contract §22: `/admin/users/{phira_id}`).
 const phiraId = computed(() => Number(route.params.id))
 
 const tab = ref('overview')
-const actionMsg = ref('')
+const notice = useNotice()
+const validationMsg = ref('')
+const selectedIp = ref('')
 const permStore = usePermissionsStore()
 
 onMounted(() => {
@@ -72,21 +76,43 @@ const permLabel = (id: string): string => permStore.find(id)?.label ?? id
 /** §23 #5: ip_history is a dynamic PMP payload — render as JSON. */
 const ipHistoryJson = computed(() => JSON.stringify(security.data.value?.ip_history ?? [], null, 2))
 
+/** Extract selectable IPs without freezing PMP's intentionally dynamic payload. */
+const knownIps = computed<string[]>(() => {
+  const found = new Set<string>()
+  const visit = (value: unknown, key = ''): void => {
+    if (typeof value === 'string' && /^(?:ip|address|remote_addr)$/i.test(key)) {
+      const candidate = value.includes(':') && value.includes('.') ? value.replace(/:\d+$/, '') : value
+      if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(candidate) || candidate.includes(':'))
+        found.add(candidate)
+      return
+    }
+    if (Array.isArray(value)) {
+      value.forEach(item => visit(item, key))
+      return
+    }
+    if (value && typeof value === 'object') {
+      Object.entries(value as Record<string, unknown>).forEach(([childKey, child]) => visit(child, childKey))
+    }
+  }
+  visit(security.data.value?.ip_history ?? [])
+  return [...found]
+})
+
 const reauth = useReauth()
 
 // §23 #10: ban / unban / ban_ip / unban_ip require reauth; kick / revoke do not.
 const REAUTH_ACTIONS = new Set<string>([USER_ACTION.ban, USER_ACTION.unban, USER_ACTION.banIp, USER_ACTION.unbanIp])
 
 async function doAction(action: string, args: Record<string, unknown> = {}, reauthToken?: string) {
-  actionMsg.value = ''
+  validationMsg.value = ''
   try {
     await runUserAction(phiraId.value, action, args, reauthToken)
-    actionMsg.value = `操作 ${action} 已提交`
+    notice.success('notice.actionCompleted', { dedupKey: `user:${phiraId.value}:${action}` })
     void security.run()
     void multiplayer.run()
   }
   catch (err) {
-    actionMsg.value = err instanceof ApiError ? err.message : '操作失败'
+    notice.errorFromApi(err, { dedupKey: `user:${phiraId.value}:${action}:error` })
   }
 }
 
@@ -102,6 +128,15 @@ function dispatchAction(action: string, args: Record<string, unknown> = {}) {
   }
 }
 
+function dispatchIpAction(action: string): void {
+  const ip = selectedIp.value.trim()
+  if (!ip) {
+    validationMsg.value = t('userDetail.ipRequired')
+    return
+  }
+  dispatchAction(action, action === USER_ACTION.unbanIp ? { ip } : { target: ip, reason: 'admin' })
+}
+
 function auditRow(e: AuditEvent) {
   return `${formatDateTime(e.occurred_at)} · ${e.principal_type} · ${e.action} · ${e.resource_type} · ${e.result}`
 }
@@ -109,29 +144,27 @@ function auditRow(e: AuditEvent) {
 
 <template>
   <div>
-    <PageHeader :title="account?.username ?? `用户 ${phiraId}`" subtitle="PPB + PMP 统一管理（§18.4）">
+    <PageHeader :title="account?.username ?? t('userDetail.userTitle', { id: phiraId })" :subtitle="t('userDetail.subtitle')">
       <template #actions>
         <NuxtLink to="/users" class="text-xs text-muted hover:text-foreground">
-          ← 用户列表
+          ← {{ t('userDetail.back') }}
         </NuxtLink>
       </template>
     </PageHeader>
 
-    <UTabs
+    <PPTabs
       v-model="tab"
       :tabs="[
-        { key: 'overview', label: 'Overview' },
-        { key: 'multiplayer', label: 'Multiplayer' },
-        { key: 'groups', label: 'Groups & Perms' },
-        { key: 'sessions', label: 'Sessions / Identity' },
-        { key: 'security', label: 'Security / IP' },
-        { key: 'audit', label: 'Audit' },
+        { key: 'overview', label: t('userDetail.tabOverview') },
+        { key: 'multiplayer', label: t('userDetail.tabMultiplayer') },
+        { key: 'groups', label: t('userDetail.tabGroups') },
+        { key: 'sessions', label: t('userDetail.tabSessions') },
+        { key: 'security', label: t('userDetail.tabSecurity') },
+        { key: 'audit', label: t('userDetail.tabAudit') },
       ]"
     />
 
-    <p v-if="actionMsg" class="mt-2 text-sm text-accent" role="status">
-      {{ actionMsg }}
-    </p>
+    <p v-if="validationMsg" class="mt-2 text-sm text-danger" role="alert">{{ validationMsg }}</p>
 
     <!-- Overview -->
     <div v-if="tab === 'overview'" class="mt-4 space-y-4">
@@ -154,30 +187,30 @@ function auditRow(e: AuditEvent) {
             </div>
             <div>
               <dt class="text-xs text-muted">
-                状态
+                {{ t('userDetail.status') }}
               </dt><dd :class="account?.status === 'banned' ? 'text-danger' : 'text-foreground'">
-                {{ account?.status }}
+                {{ userStatusLabel(t, account?.status) }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                创建时间
+                {{ t('userDetail.created') }}
               </dt><dd class="text-foreground">
                 {{ formatDateTime(account?.created_at) }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                最近活跃
+                {{ t('userDetail.lastSeen') }}
               </dt><dd class="text-foreground">
                 {{ formatDateTime(account?.last_seen_at ?? undefined) }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                Avatar
+                {{ t('userDetail.avatar') }}
               </dt><dd class="truncate text-foreground">
-                {{ account?.avatar || '—' }}
+                {{ account?.avatar || t('common.unknown') }}
               </dd>
             </div>
           </dl>
@@ -185,13 +218,13 @@ function auditRow(e: AuditEvent) {
 
         <section class="rounded-lg border border-border bg-surface p-4">
           <h3 class="mb-2 text-sm font-medium text-foreground">
-            PMP player
+            {{ t('userDetail.pmpPlayer') }}
           </h3>
           <template v-if="user.data.value?.player">
             <pre class="max-h-48 overflow-auto rounded bg-surface-secondary p-2 font-mono text-xs">{{ JSON.stringify(user.data.value.player, null, 2) }}</pre>
           </template>
           <p v-else class="text-sm text-muted">
-            PMP 未连接或该用户无在线数据（player 动态 payload）。
+            {{ t('userDetail.playerUnavailable') }}
           </p>
         </section>
       </AsyncState>
@@ -204,44 +237,44 @@ function auditRow(e: AuditEvent) {
           <dl class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
             <div>
               <dt class="text-xs text-muted">
-                在线
+                {{ t('userDetail.online') }}
               </dt><dd :class="multiplayer.data.value?.online ? 'text-success' : 'text-muted'">
-                {{ multiplayer.data.value?.online ? '在线' : '离线' }}
+                {{ multiplayer.data.value?.online ? t('userDetail.online') : t('userDetail.offline') }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                当前房间
+                {{ t('userDetail.currentRoom') }}
               </dt><dd class="font-mono text-foreground">
-                {{ multiplayer.data.value?.current_room ?? '—' }}
+                {{ multiplayer.data.value?.current_room ?? t('common.unknown') }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                游玩时长
+                {{ t('userDetail.playtime') }}
               </dt><dd class="text-foreground">
                 {{ formatDuration(multiplayer.data.value?.playtime_secs ?? undefined) }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                Rounds
+                {{ t('userDetail.rounds') }}
               </dt><dd class="text-foreground">
-                {{ multiplayer.data.value?.rounds_played ?? '—' }}
+                {{ multiplayer.data.value?.rounds_played ?? t('common.unknown') }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                Replays
+                {{ t('userDetail.replays') }}
               </dt><dd class="text-foreground">
-                {{ multiplayer.data.value?.replay_count ?? '—' }}
+                {{ multiplayer.data.value?.replay_count ?? t('common.unknown') }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                封禁状态
+                {{ t('userDetail.banState') }}
               </dt><dd :class="multiplayer.data.value?.ban_state ? 'text-danger' : 'text-foreground'">
-                {{ multiplayer.data.value?.ban_state ? '已封禁' : '未封禁' }}
+                {{ multiplayer.data.value?.ban_state ? t('userDetail.banned') : t('userDetail.notBanned') }}
               </dd>
             </div>
           </dl>
@@ -254,20 +287,20 @@ function auditRow(e: AuditEvent) {
       <AsyncState :loading="user.loading.value" :error="user.error.value" :empty="false">
         <section class="rounded-lg border border-border bg-surface p-4">
           <h3 class="mb-2 text-sm font-medium text-foreground">
-            所属用户组
+            {{ t('userDetail.memberGroups') }}
           </h3>
           <div class="flex flex-wrap gap-1">
-            <UBadge v-for="g in userGroups" :key="g.id" tone="accent">
-              {{ g.name }}{{ g.is_default ? '（默认）' : '' }}
-            </UBadge>
-            <span v-if="!userGroups.length" class="text-sm text-muted">暂无用户组</span>
+            <PPBadge v-for="g in userGroups" :key="g.id" tone="accent">
+              {{ g.name }}{{ g.is_default ? ` (${t('userDetail.defaultGroup')})` : '' }}
+            </PPBadge>
+            <span v-if="!userGroups.length" class="text-sm text-muted">{{ t('userDetail.noGroups') }}</span>
           </div>
           <p class="mt-3 text-xs text-muted">
-            有效权限 = 所属组权限并集（admin_scope 自动映射全部非 root 权限）。成员分配请在「用户组」页面操作（§18.4/§18.5）。
+            {{ t('userDetail.permissionsHint') }}
           </p>
           <div v-if="effectivePerms.length" class="mt-3">
             <h4 class="mb-1 text-sm font-medium text-foreground">
-              有效权限预览（{{ effectivePerms.length }}）
+              {{ t('userDetail.effectivePermissions', { count: effectivePerms.length }) }}
             </h4>
             <ul class="grid grid-cols-1 gap-1 text-xs text-muted sm:grid-cols-2">
               <li v-for="p in effectivePerms" :key="p" class="flex items-center gap-2">
@@ -277,7 +310,7 @@ function auditRow(e: AuditEvent) {
             </ul>
           </div>
           <p v-else class="mt-3 text-xs text-muted">
-            暂无有效权限（无组成员或权限为空）。
+            {{ t('userDetail.noPermissions') }}
           </p>
         </section>
       </AsyncState>
@@ -289,25 +322,25 @@ function auditRow(e: AuditEvent) {
         <section class="rounded-lg border border-border bg-surface p-4">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="text-sm font-medium text-foreground">
-              活动会话
+              {{ t('userDetail.activeSessions') }}
             </h3>
-            <UButton size="sm" variant="danger" @click="doAction(USER_ACTION.revokeSessions)">
-              撤销全部会话
-            </UButton>
+            <PPButton size="sm" weight="dangerous" @click="doAction(USER_ACTION.revokeSessions)">
+              {{ t('userDetail.revokeSessions') }}
+            </PPButton>
           </div>
           <table class="w-full text-left text-sm">
             <thead>
               <tr class="border-b border-border text-xs uppercase text-muted">
                 <th class="px-2 py-1">
-                  客户端
+                  {{ t('userDetail.client') }}
                 </th><th class="px-2 py-1">
-                  设备
+                  {{ t('userDetail.device') }}
                 </th><th class="px-2 py-1">
                   IP
                 </th><th class="px-2 py-1">
-                  创建
+                  {{ t('userDetail.createdShort') }}
                 </th><th class="px-2 py-1">
-                  状态
+                  {{ t('userDetail.status') }}
                 </th>
               </tr>
             </thead>
@@ -317,10 +350,10 @@ function auditRow(e: AuditEvent) {
                   {{ s.client_type }}
                 </td>
                 <td class="px-2 py-1.5 text-muted">
-                  {{ s.device_name || '—' }}
+                  {{ s.device_name || t('common.unknown') }}
                 </td>
                 <td class="px-2 py-1.5 font-mono text-xs text-muted">
-                  {{ s.ip || '—' }}
+                  {{ s.ip || t('common.unknown') }}
                 </td>
                 <td class="px-2 py-1.5 text-muted">
                   {{ formatDateTime(s.created_at) }}
@@ -340,40 +373,62 @@ function auditRow(e: AuditEvent) {
       <AsyncState :loading="security.loading.value" :error="security.error.value" :empty="false">
         <section class="rounded-lg border border-border bg-surface p-4">
           <h3 class="mb-2 text-sm font-medium text-foreground">
-            账户安全操作
+            {{ t('userDetail.securityActions') }}
           </h3>
           <div class="flex flex-wrap gap-2">
-            <UButton size="sm" variant="outline" @click="dispatchAction(USER_ACTION.ban, { reason: 'admin' })">
-              封禁
-            </UButton>
-            <UButton size="sm" variant="outline" @click="dispatchAction(USER_ACTION.unban)">
-              解封
-            </UButton>
-            <UButton size="sm" variant="outline" @click="dispatchAction(USER_ACTION.kick)">
-              踢出房间
-            </UButton>
-            <UButton size="sm" variant="danger" @click="dispatchAction(USER_ACTION.banIp)">
-              封禁 IP
-            </UButton>
-            <UButton size="sm" variant="outline" @click="dispatchAction(USER_ACTION.unbanIp)">
-              解封 IP
-            </UButton>
+            <PPButton size="sm" weight="secondary" @click="dispatchAction(USER_ACTION.ban, { reason: 'admin' })">
+              {{ t('userDetail.ban') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" @click="dispatchAction(USER_ACTION.unban)">
+              {{ t('userDetail.unban') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" @click="dispatchAction(USER_ACTION.kick)">
+              {{ t('userDetail.kick') }}
+            </PPButton>
+            <PPButton size="sm" weight="dangerous" :disabled="!selectedIp.trim()" @click="dispatchIpAction(USER_ACTION.banIp)">
+              {{ t('userDetail.ban') }} IP
+            </PPButton>
+            <PPButton size="sm" weight="secondary" :disabled="!selectedIp.trim()" @click="dispatchIpAction(USER_ACTION.unbanIp)">
+              {{ t('userDetail.unban') }} IP
+            </PPButton>
+          </div>
+          <label class="mt-3 block max-w-md text-xs text-muted">
+            {{ t('userDetail.targetIp') }}
+            <PPInput
+              v-model="selectedIp"
+              type="text"
+              autocomplete="off"
+              :placeholder="t('userDetail.ipPlaceholder')"
+              class="mt-1"
+            />
+          </label>
+          <div v-if="knownIps.length" class="mt-2 flex flex-wrap gap-1.5" :aria-label="t('userDetail.ipQuickSelect')">
+            <button
+              v-for="ip in knownIps"
+              :key="ip"
+              type="button"
+              class="rounded-md border border-border px-2 py-1 font-mono text-xs text-muted hover:border-accent hover:text-foreground"
+              :class="selectedIp === ip ? 'border-accent text-accent' : ''"
+              @click="selectedIp = ip"
+            >
+              {{ ip }}
+            </button>
           </div>
           <p class="mt-3 text-xs text-muted">
-            封禁原因 / IP 由 args 传入；所有操作经 Action Registry 审计（§6）。
+            {{ t('userDetail.ipActionHint') }}
           </p>
         </section>
 
         <section class="rounded-lg border border-border bg-surface p-4">
           <h3 class="mb-2 text-sm font-medium text-foreground">
-            IP 历史
+            {{ t('userDetail.ipHistory') }}
           </h3>
           <p v-if="!(security.data.value?.ip_history ?? []).length" class="text-sm text-muted">
-            无 IP 历史记录。
+            {{ t('userDetail.noIpHistory') }}
           </p>
           <pre v-else class="max-h-48 overflow-auto rounded bg-surface-secondary p-2 font-mono text-xs">{{ ipHistoryJson }}</pre>
           <p class="mt-2 text-xs text-muted">
-            IP history / bans 为 PMP 动态 payload（§23 #5 / §13），结构随 PMP 演进，此处原样展示。
+            {{ t('userDetail.ipPayloadHint') }}
           </p>
         </section>
       </AsyncState>

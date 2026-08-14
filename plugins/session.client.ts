@@ -1,5 +1,6 @@
 import { defineNuxtPlugin } from 'nuxt/app'
 import { useAuthStore } from '~/stores/auth'
+import { usePanelI18n } from '~/composables/usePanelI18n'
 
 /**
  * Probe the PPB session on startup (SPA). The session cookie is HttpOnly;
@@ -10,4 +11,5 @@ export default defineNuxtPlugin(async () => {
   const auth = useAuthStore()
   if (!auth.initialized)
     await auth.loadSession()
+  await usePanelI18n().syncFromAccount()
 })

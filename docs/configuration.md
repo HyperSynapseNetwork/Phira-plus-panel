@@ -8,7 +8,7 @@
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `NUXT_PUBLIC_API_BASE` | `https://api-phira.htadiy.com` | PPB REST API 基础 URL。Panel 请求走 credentialed CORS（`credentials:'include'`），PPB 必须精确放行 `http://localhost:3000`（dev）/ `https://panel-phira.htadiy.com`（prod） |
+| `NUXT_PUBLIC_API_BASE` | **必填** | PPB REST API 基础 URL。Panel 请求走 credentialed CORS（`credentials:'include'`），PPB 必须精确放行 `http://localhost:3000`（dev）/ `https://panel-phira.htadiy.com`（prod） |
 
 本地联调示例：
 
@@ -20,7 +20,7 @@ NUXT_PUBLIC_API_BASE=http://localhost:8000
 
 | 键 | 默认 | 说明 |
 |---|---|---|
-| `apiBase` | `https://api-phira.htadiy.com` | 同 `NUXT_PUBLIC_API_BASE`；未设环境变量时的回退值 |
+| `apiBase` | 无默认值 | 同 `NUXT_PUBLIC_API_BASE`；缺失或不是绝对 HTTP(S) URL 时 fail-fast |
 
 ## noindex 配置（设计 §23.2）
 

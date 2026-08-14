@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { rootReauth } from '~/api/admin'
-import { ApiError } from '~/utils/api-error'
+import { localizePanelError } from '~/utils/api-error'
 
 /**
  * Sensitive-action reauth flow (§23 #10). Elevated writes (ban / IP-ban /
@@ -12,14 +12,17 @@ import { ApiError } from '~/utils/api-error'
  * render `<ReauthModal>` bound to the returned state.
  */
 export function useReauth() {
+  const { t } = usePanelI18n()
   const open = ref(false)
   const password = ref('')
   const busy = ref(false)
   const error = ref('')
   let pending: ((token: string) => Promise<void>) | null = null
+  let pendingRisk: 'high' | 'critical' = 'high'
 
-  function requireReauth(action: (token: string) => Promise<void>) {
+  function requireReauth(action: (token: string) => Promise<void>, risk: 'high' | 'critical' = 'high') {
     pending = action
+    pendingRisk = risk
     password.value = ''
     error.value = ''
     open.value = true
@@ -38,7 +41,7 @@ export function useReauth() {
     busy.value = true
     error.value = ''
     try {
-      const { reauth_token } = await rootReauth(password.value)
+      const { reauth_token } = await rootReauth(password.value, pendingRisk)
       const action = pending
       open.value = false
       pending = null
@@ -46,7 +49,7 @@ export function useReauth() {
       await action(reauth_token)
     }
     catch (err) {
-      error.value = err instanceof ApiError ? err.message : '重认证失败'
+      error.value = localizePanelError(t, err).message
     }
     finally {
       busy.value = false

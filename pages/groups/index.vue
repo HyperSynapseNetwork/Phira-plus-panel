@@ -6,17 +6,18 @@ import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
 import PermissionTree from '~/components/admin/PermissionTree.vue'
 import ReauthModal from '~/components/admin/ReauthModal.vue'
-import UBadge from '~/components/ui/UBadge.vue'
-import UButton from '~/components/ui/UButton.vue'
-import UInput from '~/components/ui/UInput.vue'
-import UModal from '~/components/ui/UModal.vue'
-import UTextarea from '~/components/ui/UTextarea.vue'
+import PPBadge from '~/components/ui/PPBadge.vue'
+import PPButton from '~/components/ui/PPButton.vue'
+import PPInput from '~/components/ui/PPInput.vue'
+import PPModal from '~/components/ui/PPModal.vue'
+import PPTextarea from '~/components/ui/PPTextarea.vue'
 import { useAsync } from '~/composables/useAsync'
 import { useReauth } from '~/composables/useReauth'
 import { usePermissionsStore } from '~/stores/permissions'
-import { ApiError } from '~/utils/api-error'
 
 definePageMeta({ permissions: ['group:view'] })
+
+const { t } = usePanelI18n()
 
 const permStore = usePermissionsStore()
 const reauth = useReauth()
@@ -30,7 +31,7 @@ const form = ref({ name: '', description: '', isDefault: false })
 const selectedPerms = ref<string[]>([])
 const memberText = ref('')
 const busy = ref(false)
-const msg = ref('')
+const notice = useNotice()
 
 onMounted(() => {
   void permStore.load()
@@ -64,7 +65,6 @@ async function save(reauthToken?: string) {
   if (!form.value.name.trim())
     return
   busy.value = true
-  msg.value = ''
   try {
     const memberIds = parseMembers(memberText.value)
     if (editing.value) {
@@ -79,12 +79,12 @@ async function save(reauthToken?: string) {
       if (memberIds.length)
         await setGroupMembers(created.id, memberIds, reauthToken)
     }
-    msg.value = '保存成功'
+    notice.success('notice.saved', { dedupKey: 'group:save' })
     closeModal()
     void list.run()
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '保存失败'
+    notice.errorFromApi(err, { dedupKey: 'group:save:error' })
   }
   finally {
     busy.value = false
@@ -115,15 +115,14 @@ async function confirmDelete() {
   if (!showDelete.value)
     return
   busy.value = true
-  msg.value = ''
   try {
     await deleteGroup(showDelete.value.id)
-    msg.value = '已删除'
+    notice.success('notice.deleted', { dedupKey: 'group:delete' })
     showDelete.value = null
     void list.run()
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '删除失败'
+    notice.errorFromApi(err, { dedupKey: 'group:delete:error' })
   }
   finally {
     busy.value = false
@@ -133,19 +132,15 @@ async function confirmDelete() {
 
 <template>
   <div>
-    <PageHeader title="用户组与权限" subtitle="Manifest 驱动 UI · 前端零硬编码权限全集（§18.5）">
+    <PageHeader :title="t('groupsPage.title')" :subtitle="t('groupsPage.subtitle')">
       <template #actions>
-        <UButton variant="primary" size="sm" @click="openCreate">
-          新建用户组
-        </UButton>
+        <PPButton weight="primary" size="sm" @click="openCreate">
+          {{ t('groupsPage.create') }}
+        </PPButton>
       </template>
     </PageHeader>
-
-    <p v-if="msg" class="mb-2 text-sm text-accent" role="status">
-      {{ msg }}
-    </p>
     <p v-if="permStore.error" class="mb-2 text-sm text-danger">
-      权限 Manifest 不可用（PPB 未就绪）——权限树将不可编辑。
+      {{ t('groupsPage.manifestUnavailable') }}
     </p>
 
     <AsyncState :loading="list.loading.value" :error="list.error.value" :empty="(list.data.value?.items ?? []).length === 0">
@@ -154,19 +149,19 @@ async function confirmDelete() {
           <thead>
             <tr class="border-b border-border text-xs uppercase text-muted">
               <th class="px-3 py-2 font-medium">
-                名称
+                {{ t('groupsPage.name') }}
               </th>
               <th class="px-3 py-2 font-medium">
-                类型
+                {{ t('groupsPage.type') }}
               </th>
               <th class="px-3 py-2 font-medium">
-                成员
+                {{ t('groupsPage.members') }}
               </th>
               <th class="px-3 py-2 font-medium">
-                权限数
+                {{ t('groupsPage.permissionCount') }}
               </th>
               <th class="px-3 py-2 font-medium">
-                操作
+                {{ t('groupsPage.actions') }}
               </th>
             </tr>
           </thead>
@@ -180,13 +175,13 @@ async function confirmDelete() {
                 </p>
               </td>
               <td class="px-3 py-2">
-                <UBadge v-if="g.system_kind === 'admin_scope'" tone="danger">
-                  admin_scope
-                </UBadge>
-                <UBadge v-else-if="g.protected" tone="warning">
-                  protected
-                </UBadge>
-                <span v-else class="text-muted">普通</span>
+                <PPBadge v-if="g.system_kind === 'admin_scope'" tone="danger">
+                  {{ t('groupsPage.adminScopeLabel') }}
+                </PPBadge>
+                <PPBadge v-else-if="g.protected" tone="warning">
+                  {{ t('groupsPage.protectedLabel') }}
+                </PPBadge>
+                <span v-else class="text-muted">{{ t('groupsPage.ordinary') }}</span>
               </td>
               <td class="px-3 py-2">
                 {{ g.member_count ?? '—' }}
@@ -196,12 +191,12 @@ async function confirmDelete() {
               </td>
               <td class="px-3 py-2">
                 <div class="flex gap-2">
-                  <UButton size="sm" variant="outline" @click="openEdit(g)">
-                    编辑
-                  </UButton>
-                  <UButton size="sm" variant="danger" :disabled="g.protected || g.system_kind === 'admin_scope'" @click="showDelete = g">
-                    删除
-                  </UButton>
+                  <PPButton size="sm" weight="secondary" @click="openEdit(g)">
+                    {{ t('groupsPage.edit') }}
+                  </PPButton>
+                  <PPButton size="sm" weight="dangerous" :disabled="g.protected || g.system_kind === 'admin_scope'" @click="showDelete = g">
+                    {{ t('groupsPage.delete') }}
+                  </PPButton>
                 </div>
               </td>
             </tr>
@@ -211,46 +206,46 @@ async function confirmDelete() {
     </AsyncState>
 
     <p class="mt-2 text-xs text-muted">
-      Administrators（admin_scope）自动映射全部非 root 权限（§8.3），不在此逐项授予；普通组禁止 `*:*`。
+      {{ t('groupsPage.adminScopeHint') }}
     </p>
 
     <!-- Create / edit modal -->
-    <UModal
+    <PPModal
       :open="creating || !!editing"
-      :title="editing ? `编辑用户组 ${editing.name}` : '新建用户组'"
+      :title="editing ? t('groupsPage.editTitle', { name: editing.name }) : t('groupsPage.createTitle')"
       @close="closeModal"
     >
       <div class="space-y-4">
-        <UInput v-model="form.name" label="名称" required />
-        <UTextarea v-model="form.description" label="描述" :rows="2" />
+        <PPInput v-model="form.name" :label="t('groupsPage.name')" required />
+        <PPTextarea v-model="form.description" :label="t('groupsPage.description')" :rows="2" />
         <label class="flex items-center gap-2 text-sm text-foreground">
           <input v-model="form.isDefault" type="checkbox" class="rounded">
-          设为默认用户组
+          {{ t('groupsPage.defaultGroup') }}
         </label>
         <div>
           <p class="mb-1 text-sm font-medium text-foreground">
-            权限
+            {{ t('groupsPage.permissions') }}
           </p>
           <p v-if="editing?.system_kind === 'admin_scope'" class="mb-1 text-xs text-warning">
-            admin_scope 自动映射全部非 root 权限，不在此逐项授予（§8.3）。
+            {{ t('groupsPage.adminScopeAuto') }}
           </p>
           <p v-else-if="editing?.protected" class="mb-1 text-xs text-warning">
-            该组为受保护的内置组，权限可编辑但请谨慎操作。
+            {{ t('groupsPage.protectedHint') }}
           </p>
           <PermissionTree v-model="selectedPerms" :disabled="editing?.system_kind === 'admin_scope'" />
         </div>
         <div v-if="editing">
           <p class="mb-1 text-sm font-medium text-foreground">
-            成员（user_id，逗号 / 换行分隔）
+            {{ t('groupsPage.memberInput') }}
           </p>
-          <UInput v-model="memberText" placeholder="例如 7f3c…,9a2b… （留空则不修改成员）" />
+          <PPInput v-model="memberText" :placeholder="t('groupsPage.memberPlaceholder')" />
         </div>
         <div v-if="editing || creating">
           <p class="mb-1 text-sm font-medium text-foreground">
-            有效权限预览
+            {{ t('groupsPage.effectivePreview') }}
           </p>
           <p class="mb-1 text-xs text-muted">
-            {{ editing?.system_kind === 'admin_scope' || form.name === 'Administrators' ? 'admin_scope：自动映射全部非 root 权限' : `已选 ${effectiveCount} 项（服务端为最终权威）` }}
+            {{ editing?.system_kind === 'admin_scope' || form.name === 'Administrators' ? t('groupsPage.effectiveAdmin') : t('groupsPage.effectiveSelected', { count: effectiveCount }) }}
           </p>
           <ul class="max-h-32 space-y-0.5 overflow-auto text-xs text-muted">
             <li v-for="id in effectivePermissions" :key="id" class="font-mono">
@@ -258,38 +253,35 @@ async function confirmDelete() {
             </li>
           </ul>
         </div>
-        <p v-if="msg" class="text-sm text-danger">
-          {{ msg }}
-        </p>
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="closeModal">
-            取消
-          </UButton>
-          <UButton variant="primary" :disabled="busy || !form.name.trim()" @click="submitSave">
-            保存
-          </UButton>
+          <PPButton weight="quiet" @click="closeModal">
+            {{ t('common.cancel') }}
+          </PPButton>
+          <PPButton weight="primary" :disabled="busy || !form.name.trim()" @click="submitSave">
+            {{ t('common.save') }}
+          </PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
 
     <!-- Delete confirm -->
-    <UModal :open="!!showDelete" title="确认删除用户组" width="max-w-md" @close="showDelete = null">
+    <PPModal :open="!!showDelete" :title="t('groupsPage.deleteTitle')" width="max-w-md" @close="showDelete = null">
       <p class="text-sm text-foreground">
-        删除用户组 <b>{{ showDelete?.name }}</b>？组内成员将失去该组授予的权限。受保护组不可删除。
+        {{ t('groupsPage.deleteConfirm', { name: showDelete?.name ?? '' }) }}
       </p>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="showDelete = null">
-            取消
-          </UButton>
-          <UButton variant="danger" :disabled="busy" @click="confirmDelete">
-            删除
-          </UButton>
+          <PPButton weight="quiet" @click="showDelete = null">
+            {{ t('common.cancel') }}
+          </PPButton>
+          <PPButton weight="dangerous" :disabled="busy" @click="confirmDelete">
+            {{ t('groupsPage.delete') }}
+          </PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
 
     <ReauthModal
       :open="reauth.open.value"

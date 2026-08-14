@@ -4,31 +4,36 @@ import { diffConfig, fetchConfigDescriptors, fetchConfigRaw, fetchConfigSnapshot
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
 import ReauthModal from '~/components/admin/ReauthModal.vue'
-import UBadge from '~/components/ui/UBadge.vue'
-import UButton from '~/components/ui/UButton.vue'
-import UCard from '~/components/ui/UCard.vue'
-import UInput from '~/components/ui/UInput.vue'
-import UModal from '~/components/ui/UModal.vue'
-import USwitch from '~/components/ui/USwitch.vue'
-import UTextarea from '~/components/ui/UTextarea.vue'
+import PPBadge from '~/components/ui/PPBadge.vue'
+import PPStatus from '~/components/ui/PPStatus.vue'
+import PPButton from '~/components/ui/PPButton.vue'
+import PPSection from '~/components/patterns/PPSection.vue'
+import PPInput from '~/components/ui/PPInput.vue'
+import PPModal from '~/components/ui/PPModal.vue'
+import PPSwitch from '~/components/ui/PPSwitch.vue'
+import PPTextarea from '~/components/ui/PPTextarea.vue'
 import { useAsync } from '~/composables/useAsync'
 import { useReauth } from '~/composables/useReauth'
-import { ApiError } from '~/utils/api-error'
 import { formatDateTime } from '~/utils/format'
+import type { ConfigValidationIssue } from '~/features/config/types'
 
 definePageMeta({ permissions: ['config:view'] })
 
 const reauth = useReauth()
+const { t } = usePanelI18n()
 
 const descriptors = useAsync(() => fetchConfigDescriptors())
 const values = useAsync(() => fetchConfigValues())
 const snapshots = useAsync(() => fetchConfigSnapshots())
 
 const form = reactive<Record<string, any>>({})
-const msg = ref('')
+const notice = useNotice()
 const busy = ref(false)
+const validationErrors = ref<ConfigValidationIssue[]>([])
 const rawModal = ref(false)
 const rawText = ref('')
+const rawLoading = ref(false)
+const rawError = ref<Error | null>(null)
 const diffModal = ref(false)
 const diffData = ref<Array<{ path: string, old: unknown, new: unknown }>>([])
 const rollbackTarget = ref<string | null>(null)
@@ -95,8 +100,13 @@ const groups = computed(() => descriptors.data.value?.groups ?? [])
 const reloadTone = (r: string) => (r === 'hot' ? 'success' : r === 'restart' ? 'warning' : 'danger')
 const isEditable = (reloadSemantics: string) => reloadSemantics === 'hot'
 
+function validationMessage(item: ConfigValidationIssue): string {
+  const key = `configPage.validationCodes.${item.code}`
+  const translated = t(key, item.params ?? {})
+  return translated === key ? t('configPage.validationUnknown') : translated
+}
+
 async function previewDiff() {
-  msg.value = ''
   busy.value = true
   try {
     const res = await diffConfig(formValues.value)
@@ -104,63 +114,71 @@ async function previewDiff() {
     diffModal.value = true
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '对比失败'
+    notice.errorFromApi(err, { dedupKey: 'config:diff:error' })
   }
   finally {
     busy.value = false
   }
 }
 
-async function doSave() {
-  msg.value = ''
+async function doSave(reauthToken?: string) {
   busy.value = true
+  validationErrors.value = []
   try {
     const v = await validateConfig(formValues.value)
     if (!v.ok) {
-      msg.value = v.errors.map(e => `${e.path}: ${e.message}`).join('；')
+      validationErrors.value = v.errors
       return
     }
-    await saveConfig(formValues.value)
+    await saveConfig(formValues.value, reauthToken)
     replaceSecrets.value = new Set()
-    msg.value = '已保存（PPB 已生成 YAML 并快照）'
+    notice.success('notice.configApplied', { dedupKey: 'config:save' })
     diffModal.value = false
     void snapshots.run()
     void values.run()
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '保存失败'
+    notice.errorFromApi(err, { dedupKey: 'config:save:error' })
   }
   finally {
     busy.value = false
   }
 }
 
+// Config save is a critical mutation: Diff -> Save -> Reauth -> server-enforced save.
+function submitSave() {
+  reauth.requireReauth(async (token) => {
+    await doSave(token)
+  }, 'critical')
+}
+
+async function loadRaw(): Promise<void> {
+  rawLoading.value = true
+  rawError.value = null
+  try { rawText.value = await fetchConfigRaw() }
+  catch (err) { rawError.value = err instanceof Error ? err : new Error('INVALID_RESPONSE') }
+  finally { rawLoading.value = false }
+}
 function openRaw() {
   rawText.value = ''
-  void fetchConfigRaw()
-    .then((t) => {
-      rawText.value = t
-    })
-    .catch(() => {
-      rawText.value = ''
-    })
+  rawError.value = null
   rawModal.value = true
+  void loadRaw()
 }
 
 async function doRollback(reauthToken?: string) {
   if (!rollbackTarget.value)
     return
   busy.value = true
-  msg.value = ''
   try {
     await rollbackConfig(rollbackTarget.value, reauthToken)
-    msg.value = '已回滚快照'
+    notice.success('notice.configRolledBack', { dedupKey: 'config:rollback' })
     rollbackTarget.value = null
     void snapshots.run()
     void values.run()
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '回滚失败'
+    notice.errorFromApi(err, { dedupKey: 'config:rollback:error' })
   }
   finally {
     busy.value = false
@@ -177,34 +195,44 @@ function submitRollback() {
 
 <template>
   <div class="space-y-4">
-    <PageHeader title="配置" subtitle="Form Descriptor 模型 A（§22）· hot 可编辑 · restart/rebuild 只读 · Raw YAML 只读查看">
-      <template #actions>
-        <UButton size="sm" variant="outline" @click="openRaw">
-          Raw YAML
-        </UButton>
-        <UButton size="sm" variant="primary" :disabled="busy" @click="previewDiff">
-          Diff 预览
-        </UButton>
-      </template>
-    </PageHeader>
+    <PageHeader :title="t('configPage.title')" :subtitle="t('configPage.subtitle')" />
+
+    <nav class="flex gap-1 overflow-x-auto border-b border-border pb-2" :aria-label="t('configPage.sections')">
+      <a
+        v-for="group in groups"
+        :key="group.key"
+        :href="`#config-${group.key}`"
+        class="min-h-11 shrink-0 rounded-md px-3 py-2 text-sm text-muted hover:bg-surface-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        {{ group.label }}
+      </a>
+      <a href="#config-snapshots" class="min-h-11 shrink-0 rounded-md px-3 py-2 text-sm text-muted hover:bg-surface-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+        {{ t('configPage.snapshots') }}
+      </a>
+    </nav>
+
+    <div v-if="validationErrors.length" class="rounded border border-warning/40 bg-warning/5 px-3 py-2 text-sm" role="alert">
+      <p class="font-medium text-warning">{{ t('configPage.validation') }}</p>
+      <ul class="mt-1 space-y-0.5 text-xs text-muted">
+        <li v-for="item in validationErrors" :key="`${item.path}:${item.code}`">{{ item.path ? `${item.path}: ` : '' }}{{ validationMessage(item) }}</li>
+      </ul>
+    </div>
 
     <AsyncState :loading="descriptors.loading.value || values.loading.value" :error="descriptors.error.value || values.error.value" :empty="false">
-      <p v-if="msg" class="mb-2 text-sm text-accent" role="status">
-        {{ msg }}
-      </p>
 
       <div class="space-y-4">
-        <UCard v-for="group in groups" :key="group.key" :title="group.label">
+        <div v-for="group in groups" :id="`config-${group.key}`" :key="group.key" class="scroll-mt-20">
+        <PPSection :title="group.label">
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div v-for="d in group.fields" :key="d.path">
               <div class="mb-1 flex items-center gap-2">
                 <span class="text-sm font-medium text-foreground">{{ d.label }}</span>
-                <UBadge :tone="reloadTone(d.reload_semantics)">
+                <PPBadge :tone="reloadTone(d.reload_semantics)">
                   {{ d.reload_semantics }}
-                </UBadge>
-                <UBadge v-if="d.sensitive" tone="warning">
-                  secret
-                </UBadge>
+                </PPBadge>
+                <PPBadge v-if="d.sensitive" tone="warning">
+                  {{ t('configPage.secret') }}
+                </PPBadge>
               </div>
               <p v-if="d.description" class="mb-1 text-xs text-muted">
                 {{ d.description }}
@@ -212,38 +240,38 @@ function submitRollback() {
 
               <!-- secret → configured / missing / replace（不回显原值，§20.1） -->
               <div v-if="d.sensitive" class="flex flex-wrap items-center gap-2">
-                <UBadge :tone="secretStatus(d.path) === 'configured' ? 'success' : 'warning'">
-                  {{ secretStatus(d.path) === 'configured' ? '已配置' : '未配置' }}
-                </UBadge>
+                <PPStatus :tone="secretStatus(d.path) === 'configured' ? 'success' : 'warning'">
+                  {{ secretStatus(d.path) === 'configured' ? t('configPage.configured') : t('configPage.missing') }}
+                </PPStatus>
                 <template v-if="replaceSecrets.has(d.path)">
-                  <UInput
+                  <PPInput
                     v-model="secretValue[d.path]"
                     type="password"
-                    placeholder="输入新值（不回显）"
+                    :placeholder="t('configPage.newSecret')"
                     class="w-56"
                   />
-                  <UButton size="sm" variant="ghost" @click="toggleReplace(d.path)">
-                    取消
-                  </UButton>
+                  <PPButton size="sm" weight="quiet" @click="toggleReplace(d.path)">
+                    {{ t('common.cancel') }}
+                  </PPButton>
                 </template>
-                <UButton
+                <PPButton
                   v-else
                   size="sm"
-                  variant="outline"
+                  weight="secondary"
                   :disabled="!isEditable(d.reload_semantics)"
                   @click="toggleReplace(d.path)"
                 >
-                  {{ secretStatus(d.path) === 'configured' ? '替换' : '配置' }}
-                </UButton>
+                  {{ secretStatus(d.path) === 'configured' ? t('configPage.replace') : t('configPage.configure') }}
+                </PPButton>
               </div>
               <!-- boolean → switch -->
-              <USwitch
+              <PPSwitch
                 v-else-if="d.type === 'boolean'"
                 v-model="form[d.path]"
                 :disabled="!isEditable(d.reload_semantics)"
               />
               <!-- number -->
-              <UInput
+              <PPInput
                 v-else-if="d.type === 'number'"
                 v-model="form[d.path]"
                 type="number"
@@ -251,7 +279,7 @@ function submitRollback() {
                 :placeholder="String(form[d.path] ?? '')"
               />
               <!-- textarea / yaml -->
-              <UTextarea
+              <PPTextarea
                 v-else-if="d.widget === 'textarea' || d.widget === 'yaml'"
                 v-model="form[d.path]"
                 :rows="d.widget === 'textarea' ? 3 : 5"
@@ -260,20 +288,22 @@ function submitRollback() {
                 :disabled="!isEditable(d.reload_semantics)"
               />
               <!-- string / text fallback -->
-              <UInput
+              <PPInput
                 v-else
                 v-model="form[d.path]"
                 :disabled="!isEditable(d.reload_semantics)"
                 :placeholder="String(form[d.path] ?? '')"
               />
               <p v-if="!isEditable(d.reload_semantics)" class="mt-1 text-[11px] text-warning">
-                需要 {{ d.reload_semantics }}，保存后由部署适配器处理。
+                {{ t('configPage.reloadRequired', { mode: d.reload_semantics }) }}
               </p>
             </div>
           </div>
-        </UCard>
+        </PPSection>
+        </div>
 
-        <UCard title="快照 / 回滚">
+        <div id="config-snapshots" class="scroll-mt-20">
+        <PPSection :title="t('configPage.snapshots')">
           <AsyncState :loading="snapshots.loading.value" :error="snapshots.error.value" :empty="(snapshots.data.value?.items ?? []).length === 0">
             <table class="w-full text-left text-sm">
               <thead>
@@ -281,13 +311,13 @@ function submitRollback() {
                   <th class="px-2 py-1">
                     ID
                   </th><th class="px-2 py-1">
-                    备注
+                    {{ t('configPage.note') }}
                   </th><th class="px-2 py-1">
-                    作用域
+                    {{ t('configPage.scope') }}
                   </th><th class="px-2 py-1">
-                    时间
+                    {{ t('configPage.time') }}
                   </th><th class="px-2 py-1">
-                    操作
+                    {{ t('configPage.actions') }}
                   </th>
                 </tr>
               </thead>
@@ -297,7 +327,7 @@ function submitRollback() {
                     {{ s.id.slice(0, 8) }}
                   </td>
                   <td class="px-2 py-1.5">
-                    {{ s.note || '—' }}
+                    {{ s.note || '' }}
                   </td>
                   <td class="px-2 py-1.5 text-muted">
                     {{ s.scope }}
@@ -306,74 +336,79 @@ function submitRollback() {
                     {{ formatDateTime(s.created_at) }}
                   </td>
                   <td class="px-2 py-1.5">
-                    <UButton size="sm" variant="outline" @click="rollbackTarget = s.id">
-                      回滚
-                    </UButton>
+                    <PPButton size="sm" weight="secondary" @click="rollbackTarget = s.id">
+                      {{ t('configPage.rollback') }}
+                    </PPButton>
                   </td>
                 </tr>
               </tbody>
             </table>
           </AsyncState>
-        </UCard>
+        </PPSection>
+        </div>
       </div>
     </AsyncState>
 
+    <div class="sticky bottom-3 z-[var(--pp-z-sticky)] flex items-center justify-end gap-2 rounded-lg border border-border bg-canvas/95 px-3 py-2 shadow-lg backdrop-blur">
+      <PPButton size="sm" weight="secondary" @click="openRaw">{{ t('configPage.rawTitle') }}</PPButton>
+      <PPButton size="sm" weight="primary" :disabled="busy" @click="previewDiff">{{ t('configPage.diff') }}</PPButton>
+    </div>
+
     <!-- Diff preview modal -->
-    <UModal :open="diffModal" title="配置变更预览" width="max-w-2xl" @close="diffModal = false">
+    <PPModal :open="diffModal" :title="t('configPage.diffTitle')" width="max-w-2xl" @close="diffModal = false">
       <p v-if="diffData.length === 0" class="text-sm text-muted">
-        无变更。
+        {{ t('configPage.noChanges') }}
       </p>
       <ul class="space-y-1 text-sm">
         <li v-for="d in diffData" :key="d.path" class="rounded border border-border p-2">
           <span class="font-medium text-foreground">{{ d.path }}</span>
           <p class="text-xs text-muted">
-            旧：{{ String(d.old) }} → 新：{{ String(d.new) }}
+            {{ t('configPage.oldNew', { old: String(d.old), new: String(d.new) }) }}
           </p>
         </li>
       </ul>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="diffModal = false">
-            取消
-          </UButton>
-          <UButton variant="primary" :disabled="busy" @click="doSave">
-            保存（生成 YAML + 快照）
-          </UButton>
+          <PPButton weight="quiet" @click="diffModal = false">
+            {{ t('common.cancel') }}
+          </PPButton>
+          <PPButton weight="primary" :disabled="busy" @click="submitSave">
+            {{ t('configPage.saveSnapshot') }}
+          </PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
 
     <!-- Raw YAML modal (read-only) -->
-    <UModal :open="rawModal" title="Raw YAML（只读 · Developer / Root）" width="max-w-2xl" @close="rawModal = false">
-      <UTextarea :model-value="rawText" :rows="16" mono label="当前配置 YAML（只读）" disabled />
-      <p class="mt-2 text-xs text-muted">
-        §22 模型 A：编辑走 Form values，PPB 负责生成 YAML；此处仅查看当前生成的 YAML。
-      </p>
+    <PPModal :open="rawModal" :title="t('configPage.rawTitle')" width="max-w-2xl" @close="rawModal = false">
+      <AsyncState :loading="rawLoading" :error="rawError">
+        <PPTextarea :model-value="rawText" :rows="16" mono :label="t('configPage.rawLabel')" disabled />
+        <p class="mt-2 text-xs text-muted">{{ t('configPage.rawHint') }}</p>
+      </AsyncState>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="rawModal = false">
-            关闭
-          </UButton>
+          <PPButton v-if="rawError" weight="secondary" @click="loadRaw">{{ t('common.retry') }}</PPButton>
+          <PPButton weight="quiet" @click="rawModal = false">{{ t('common.close') }}</PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
 
     <!-- Rollback confirm -->
-    <UModal :open="!!rollbackTarget" title="确认回滚" width="max-w-md" @close="rollbackTarget = null">
+    <PPModal :open="!!rollbackTarget" :title="t('configPage.rollbackTitle')" width="max-w-md" @close="rollbackTarget = null">
       <p class="text-sm text-foreground">
-        回滚到快照 <b>{{ rollbackTarget?.slice(0, 8) }}</b>？将创建「回滚前」快照并重新加载配置。
+        {{ t('configPage.rollbackHint', { id: rollbackTarget?.slice(0, 8) ?? t('common.unknown') }) }}
       </p>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="rollbackTarget = null">
-            取消
-          </UButton>
-          <UButton variant="danger" :disabled="busy" @click="submitRollback">
-            回滚
-          </UButton>
+          <PPButton weight="quiet" @click="rollbackTarget = null">
+            {{ t('common.cancel') }}
+          </PPButton>
+          <PPButton weight="dangerous" :disabled="busy" @click="submitRollback">
+            {{ t('configPage.rollback') }}
+          </PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
 
     <ReauthModal
       :open="reauth.open.value"

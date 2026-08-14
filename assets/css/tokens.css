@@ -9,6 +9,14 @@
  */
 
 :root {
+  --pp-z-sticky: 20;
+  --pp-z-sidebar: 30;
+  --pp-z-drawer-backdrop: 60;
+  --pp-z-drawer: 70;
+  --pp-z-desktop-window-base: 40;
+  --pp-z-context: 80;
+  --pp-z-notice: 90;
+  --pp-z-reauth: 100;
   /* ── Atmosphere / Canvas（安静深色，NOT 渐变 blob / 网格）── */
   --pp-atmosphere: #0a0d13;
   --pp-canvas: #0e1119;
@@ -17,11 +25,13 @@
   --pp-surface-0: #10141d;
   --pp-surface-1: #141925;
   --pp-surface-2: #1a2030;
+  --pp-surface-3: #20283a;
 
   /* ── Material / Glass（仅控制层：header/toolbar/popover/window）── */
   --pp-material-thin: rgba(20, 25, 37, 0.70);
   --pp-material-regular: rgba(20, 25, 37, 0.82);
   --pp-material-thick: rgba(14, 17, 25, 0.92);
+  --pp-material-blur: 14px;
 
   /* ── Border ── */
   --pp-border-subtle: rgba(255, 255, 255, 0.07);
@@ -54,6 +64,9 @@
   --pp-shadow-surface: 0 1px 2px rgba(0, 0, 0, 0.30);
   --pp-shadow-floating: 0 8px 24px rgba(0, 0, 0, 0.38);
   --pp-shadow-window: 0 16px 48px rgba(0, 0, 0, 0.52);
+
+  --pp-motion-fast: 160ms;
+  --pp-motion-normal: 240ms;
 }
 
 /* 映射 HeroUI 现有语义 token → 规范词汇（让 bg-surface / text-foreground /
@@ -72,4 +85,29 @@
   --success: var(--pp-success);
   --warning: var(--pp-warning);
   --danger: var(--pp-danger);
+}
+
+
+/* Common Appearance Contract: semantic values may differ by app, names/behavior do not. */
+/* Formal runtime theme is dark-only. Light tokens return only with cross-app visual acceptance. */
+:root[data-accent="cyan"] { --pp-accent:#00d7e6; --pp-accent-hover:#20e6f2; --pp-accent-fg:#06232b; }
+:root[data-accent="blue"] { --pp-accent:#60a5fa; --pp-accent-hover:#7db5fb; --pp-accent-fg:#071b33; }
+:root[data-accent="violet"] { --pp-accent:#a78bfa; --pp-accent-hover:#b8a3fb; --pp-accent-fg:#1c1236; }
+:root[data-accent="green"] { --pp-accent:#34d399; --pp-accent-hover:#55dfad; --pp-accent-fg:#05251c; }
+:root[data-accent="amber"] { --pp-accent:#fbbf24; --pp-accent-hover:#fcca4d; --pp-accent-fg:#2c1c02; }
+
+/* Accessibility material fallback: Reduced Transparency changes material tokens, not global element opacity. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --pp-material-blur: 0px;
+    --pp-material-thin: var(--pp-surface-1);
+    --pp-material-regular: var(--pp-surface-1);
+    --pp-material-thick: var(--pp-surface-0);
+  }
+}
+:root[data-reduced-transparency="true"] {
+  --pp-material-blur: 0px;
+  --pp-material-thin: var(--pp-surface-1);
+  --pp-material-regular: var(--pp-surface-1);
+  --pp-material-thick: var(--pp-surface-0);
 }

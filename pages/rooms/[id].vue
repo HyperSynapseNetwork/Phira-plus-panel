@@ -5,23 +5,26 @@ import { useRoute } from 'vue-router'
 import { fetchRoom, runRoomAction } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
-import UBadge from '~/components/ui/UBadge.vue'
-import UButton from '~/components/ui/UButton.vue'
-import UInput from '~/components/ui/UInput.vue'
-import UModal from '~/components/ui/UModal.vue'
-import USelect from '~/components/ui/USelect.vue'
+import PPBadge from '~/components/ui/PPBadge.vue'
+import PPStatus from '~/components/ui/PPStatus.vue'
+import PPButton from '~/components/ui/PPButton.vue'
+import PPInput from '~/components/ui/PPInput.vue'
+import PPModal from '~/components/ui/PPModal.vue'
+import PPSelect from '~/components/ui/PPSelect.vue'
 import { useAsync } from '~/composables/useAsync'
 import { ROOM_ACTION } from '~/config/action-ids'
-import { ApiError } from '~/utils/api-error'
+import { roomStateLabel } from '~/features/rooms/labels'
 import { formatDateTime } from '~/utils/format'
 
 definePageMeta({ permissions: ['room:view'] })
+
+const { t } = usePanelI18n()
 
 const route = useRoute()
 const uuid = computed(() => String(route.params.id))
 
 const room = useAsync(() => fetchRoom(uuid.value))
-const actionMsg = ref('')
+const notice = useNotice()
 const busy = ref(false)
 
 const kickOpen = ref(false)
@@ -53,15 +56,14 @@ function doListAction() {
 }
 
 async function act(action: RoomActionName, args: RoomActionArgs = {}) {
-  actionMsg.value = ''
   busy.value = true
   try {
     await runRoomAction(uuid.value, action, args)
-    actionMsg.value = `动作 ${action} 已执行`
+    notice.success('notice.actionCompleted', { dedupKey: `room:${uuid.value}:${action}` })
     void room.run()
   }
   catch (err) {
-    actionMsg.value = err instanceof ApiError ? err.message : '动作失败'
+    notice.errorFromApi(err, { dedupKey: `room:${uuid.value}:${action}:error` })
   }
   finally {
     busy.value = false
@@ -83,24 +85,21 @@ function doSetChart() {
   setChartOpen.value = false
 }
 
-const stateTone = (s: string) => (s === 'playing' ? 'success' : s === 'select_chart' || s === 'waiting_for_ready' ? 'warning' : 'neutral')
+const stateTone = (s: string) => (s === 'playing' ? 'live' : s === 'select_chart' || s === 'waiting_for_ready' ? 'warning' : 'neutral')
 </script>
 
 <template>
   <div>
-    <PageHeader :title="room.data.value?.name ?? uuid" subtitle="房间详情与房主/管理员动作（§18.3）">
+    <PageHeader :title="room.data.value?.name ?? uuid" :subtitle="t('roomDetail.subtitle')">
       <template #actions>
         <NuxtLink to="/rooms" class="text-xs text-muted hover:text-foreground">
-          ← 房间列表
+          ← {{ t('roomDetail.back') }}
         </NuxtLink>
       </template>
     </PageHeader>
 
     <AsyncState :loading="room.loading.value" :error="room.error.value" :empty="false">
       <div class="space-y-4">
-        <p v-if="actionMsg" class="text-sm text-accent" role="status">
-          {{ actionMsg }}
-        </p>
 
         <section class="rounded-lg border border-border bg-surface p-4">
           <dl class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
@@ -113,66 +112,66 @@ const stateTone = (s: string) => (s === 'playing' ? 'success' : s === 'select_ch
             </div>
             <div>
               <dt class="text-xs text-muted">
-                状态
+                {{ t('roomDetail.state') }}
               </dt><dd>
-                <UBadge :tone="stateTone(room.data.value?.state ?? '')">
-                  {{ room.data.value?.state }}
-                </UBadge>
+                <PPStatus :tone="stateTone(room.data.value?.state ?? '')">
+                  {{ roomStateLabel(t, room.data.value?.state) }}
+                </PPStatus>
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                房主
+                {{ t('roomDetail.host') }}
               </dt><dd class="text-foreground">
-                {{ room.data.value?.host_id ?? (room.data.value?.system_host ? 'system' : '—') }}
+                {{ room.data.value?.host_id ?? (room.data.value?.system_host ? 'system' : t('common.unknown')) }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                成员
+                {{ t('roomDetail.members') }}
               </dt><dd class="text-foreground">
-                {{ room.data.value?.members }}（观众 {{ room.data.value?.spectators ?? 0 }}）
+                {{ room.data.value?.members }} · {{ t('roomDetail.spectators', { count: room.data.value?.spectators ?? 0 }) }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                当前谱面
+                {{ t('roomDetail.currentChart') }}
               </dt><dd class="text-foreground">
-                {{ room.data.value?.current_chart?.name ?? room.data.value?.current_chart?.song_name ?? '—' }}
+                {{ room.data.value?.current_chart?.name ?? room.data.value?.current_chart?.song_name ?? t('common.none') }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                当前 Round
+                {{ t('roomDetail.currentRound') }}
               </dt><dd class="font-mono text-foreground">
-                {{ room.data.value?.current_round_uuid ?? '—' }}
+                {{ room.data.value?.current_round_uuid ?? t('common.none') }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                标签
+                {{ t('roomDetail.tags') }}
               </dt><dd class="flex flex-wrap gap-1">
-                <UBadge v-if="room.data.value?.locked" tone="warning">
-                  locked
-                </UBadge>
-                <UBadge v-if="room.data.value?.hidden" tone="neutral">
-                  hidden
-                </UBadge>
-                <UBadge v-if="room.data.value?.persistent" tone="accent">
-                  persistent
-                </UBadge>
-                <UBadge v-if="room.data.value?.degraded" tone="danger">
-                  degraded
-                </UBadge>
-                <UBadge v-if="room.data.value?.live" tone="success">
-                  live
-                </UBadge>
-                <span v-if="!room.data.value?.locked && !room.data.value?.hidden && !room.data.value?.persistent && !room.data.value?.degraded" class="text-muted">—</span>
+                <PPBadge v-if="room.data.value?.locked" tone="warning">
+                  {{ t('roomDetail.locked') }}
+                </PPBadge>
+                <PPBadge v-if="room.data.value?.hidden" tone="neutral">
+                  {{ t('roomDetail.hidden') }}
+                </PPBadge>
+                <PPBadge v-if="room.data.value?.persistent" tone="accent">
+                  {{ t('roomDetail.persistent') }}
+                </PPBadge>
+                <PPStatus v-if="room.data.value?.degraded" tone="error">
+                  {{ t('roomDetail.degraded') }}
+                </PPStatus>
+                <PPStatus v-if="room.data.value?.live" tone="live">
+                  {{ t('roomDetail.live') }}
+                </PPStatus>
+                <span v-if="!room.data.value?.locked && !room.data.value?.hidden && !room.data.value?.persistent && !room.data.value?.degraded" class="text-muted">{{ t('common.none') }}</span>
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                创建时间
+                {{ t('roomDetail.created') }}
               </dt><dd class="text-foreground">
                 {{ formatDateTime(room.data.value?.created_at) }}
               </dd>
@@ -182,165 +181,165 @@ const stateTone = (s: string) => (s === 'playing' ? 'success' : s === 'select_ch
 
         <section class="rounded-lg border border-border bg-surface p-4">
           <h3 class="mb-2 text-sm font-medium text-foreground">
-            动作
+            {{ t('roomDetail.actions') }}
           </h3>
           <div class="flex flex-wrap gap-2">
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.lock, { locked: true })">
-              锁定
-            </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.lock, { locked: false })">
-              解锁
-            </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.cycle)">
-              切谱
-            </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.setHidden, { content: '' })">
-              切换隐藏
-            </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.setPersistent)">
-              切换持久
-            </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.setLive)">
-              切换 Live
-            </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.start)">
-              开始
-            </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.cancelStart)">
-              取消开始
-            </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="act(ROOM_ACTION.ready)">
-              准备
-            </UButton>
-            <UButton size="sm" variant="outline" :disabled="busy" @click="setChartOpen = true">
-              选谱
-            </UButton>
-            <UButton size="sm" variant="danger" :disabled="busy" @click="act(ROOM_ACTION.close)">
-              关闭房间
-            </UButton>
+            <PPButton size="sm" weight="secondary" :disabled="busy" @click="act(ROOM_ACTION.lock, { locked: true })">
+              {{ t('roomDetail.lock') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" :disabled="busy" @click="act(ROOM_ACTION.lock, { locked: false })">
+              {{ t('roomDetail.unlock') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" :disabled="busy" @click="act(ROOM_ACTION.cycle)">
+              {{ t('roomDetail.cycle') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" :disabled="busy" @click="act(ROOM_ACTION.setHidden, { content: '' })">
+              {{ t('roomDetail.toggleHidden') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" :disabled="busy" @click="act(ROOM_ACTION.setPersistent)">
+              {{ t('roomDetail.togglePersistent') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" :disabled="busy" @click="act(ROOM_ACTION.setLive)">
+              {{ t('roomDetail.toggleLive') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" :disabled="busy" @click="act(ROOM_ACTION.start)">
+              {{ t('roomDetail.start') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" :disabled="busy" @click="act(ROOM_ACTION.cancelStart)">
+              {{ t('roomDetail.cancelStart') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" :disabled="busy" @click="act(ROOM_ACTION.ready)">
+              {{ t('roomDetail.ready') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" :disabled="busy" @click="setChartOpen = true">
+              {{ t('roomDetail.selectChart') }}
+            </PPButton>
+            <PPButton size="sm" weight="dangerous" :disabled="busy" @click="act(ROOM_ACTION.close)">
+              {{ t('roomDetail.closeRoom') }}
+            </PPButton>
           </div>
         </section>
 
         <section class="rounded-lg border border-border bg-surface p-4">
           <h3 class="mb-2 text-sm font-medium text-foreground">
-            玩家与房主
+            {{ t('roomDetail.playersHost') }}
           </h3>
           <div class="flex flex-wrap gap-2">
-            <UButton size="sm" variant="outline" @click="kickOpen = true">
-              踢出玩家
-            </UButton>
-            <UButton size="sm" variant="outline" @click="moveOpen = true">
-              转移玩家
-            </UButton>
-            <UButton size="sm" variant="outline" @click="setHostOpen = true">
-              设置房主
-            </UButton>
-            <UButton size="sm" variant="outline" @click="listOpen = true">
-              名单管理
-            </UButton>
+            <PPButton size="sm" weight="secondary" @click="kickOpen = true">
+              {{ t('roomDetail.kickPlayer') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" @click="moveOpen = true">
+              {{ t('roomDetail.movePlayer') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" @click="setHostOpen = true">
+              {{ t('roomDetail.setHost') }}
+            </PPButton>
+            <PPButton size="sm" weight="secondary" @click="listOpen = true">
+              {{ t('roomDetail.lists') }}
+            </PPButton>
           </div>
           <p class="mt-2 text-xs text-muted">
-            所有动作经 Action Registry 鉴权 + 审计；每次执行重查真实 host，不信任客户端 host flag（§6/§8.5）。
+            {{ t('roomDetail.actionInvariant') }}
           </p>
         </section>
       </div>
     </AsyncState>
 
     <!-- Kick modal -->
-    <UModal :open="kickOpen" title="踢出玩家" width="max-w-md" @close="kickOpen = false">
+    <PPModal :open="kickOpen" :title="t('roomDetail.kickPlayer')" width="max-w-md" @close="kickOpen = false">
       <div class="space-y-3">
-        <UInput v-model="kickArgs.user_id" type="number" label="用户 ID" placeholder="phira_id" />
-        <UInput v-model="kickArgs.reason" label="原因" placeholder="可选，D4 说明 reason 需另行广播" />
+        <PPInput v-model="kickArgs.user_id" type="number" :label="t('roomDetail.userId')" placeholder="phira_id" />
+        <PPInput v-model="kickArgs.reason" :label="t('roomDetail.reason')" :placeholder="t('roomDetail.reasonPlaceholder')" />
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="kickOpen = false">
-            取消
-          </UButton>
-          <UButton variant="danger" @click="doKick">
-            踢出
-          </UButton>
+          <PPButton weight="quiet" @click="kickOpen = false">
+            {{ t('common.cancel') }}
+          </PPButton>
+          <PPButton weight="dangerous" @click="doKick">
+            {{ t('roomDetail.kickPlayer') }}
+          </PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
 
     <!-- Move modal -->
-    <UModal :open="moveOpen" title="转移玩家" width="max-w-md" @close="moveOpen = false">
+    <PPModal :open="moveOpen" :title="t('roomDetail.movePlayer')" width="max-w-md" @close="moveOpen = false">
       <div class="space-y-3">
-        <UInput v-model="moveArgs.user_id" type="number" label="用户 ID" placeholder="phira_id" />
-        <UInput v-model="moveArgs.target_room_uuid" label="目标房间 UUID" placeholder="目标房" />
+        <PPInput v-model="moveArgs.user_id" type="number" :label="t('roomDetail.userId')" placeholder="phira_id" />
+        <PPInput v-model="moveArgs.target_room_uuid" :label="t('roomDetail.targetRoom')" :placeholder="t('roomDetail.targetRoomPlaceholder')" />
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="moveOpen = false">
-            取消
-          </UButton>
-          <UButton variant="primary" @click="doMove">
-            转移
-          </UButton>
+          <PPButton weight="quiet" @click="moveOpen = false">
+            {{ t('common.cancel') }}
+          </PPButton>
+          <PPButton weight="primary" @click="doMove">
+            {{ t('roomDetail.movePlayer') }}
+          </PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
 
     <!-- Set chart modal -->
-    <UModal :open="setChartOpen" title="设置谱面" width="max-w-md" @close="setChartOpen = false">
+    <PPModal :open="setChartOpen" :title="t('roomDetail.setChart')" width="max-w-md" @close="setChartOpen = false">
       <div class="space-y-3">
-        <UInput v-model="setChartId" type="number" label="谱面 ID" placeholder="chart id" />
+        <PPInput v-model="setChartId" type="number" :label="t('roomDetail.chartId')" placeholder="chart id" />
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="setChartOpen = false">
-            取消
-          </UButton>
-          <UButton variant="primary" @click="doSetChart">
-            设置
-          </UButton>
+          <PPButton weight="quiet" @click="setChartOpen = false">
+            {{ t('common.cancel') }}
+          </PPButton>
+          <PPButton weight="primary" @click="doSetChart">
+            {{ t('roomDetail.set') }}
+          </PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
 
     <!-- Set host modal -->
-    <UModal :open="setHostOpen" title="设置房主" width="max-w-md" @close="setHostOpen = false">
+    <PPModal :open="setHostOpen" :title="t('roomDetail.setHost')" width="max-w-md" @close="setHostOpen = false">
       <div class="space-y-3">
-        <UInput v-model="hostId" type="number" label="房主 Phira ID" placeholder="目标房主 id" />
+        <PPInput v-model="hostId" type="number" :label="t('roomDetail.hostPhiraId')" :placeholder="t('roomDetail.hostPlaceholder')" />
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="setHostOpen = false">
-            取消
-          </UButton>
-          <UButton variant="primary" @click="doSetHost">
-            设置
-          </UButton>
+          <PPButton weight="quiet" @click="setHostOpen = false">
+            {{ t('common.cancel') }}
+          </PPButton>
+          <PPButton weight="primary" @click="doSetHost">
+            {{ t('roomDetail.set') }}
+          </PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
 
     <!-- Whitelist / blacklist modal -->
-    <UModal :open="listOpen" title="名单管理" width="max-w-md" @close="listOpen = false">
+    <PPModal :open="listOpen" :title="t('roomDetail.lists')" width="max-w-md" @close="listOpen = false">
       <div class="space-y-3">
-        <USelect
+        <PPSelect
           v-model="listAction"
-          label="动作"
+          :label="t('roomDetail.listAction')"
           :options="[
-            { label: '白名单：添加', value: ROOM_ACTION.whitelistAdd },
-            { label: '白名单：移除', value: ROOM_ACTION.whitelistRemove },
-            { label: '黑名单：封禁', value: ROOM_ACTION.blacklistBan },
-            { label: '黑名单：解封', value: ROOM_ACTION.blacklistUnban },
+            { label: t('roomDetail.whitelistAdd'), value: ROOM_ACTION.whitelistAdd },
+            { label: t('roomDetail.whitelistRemove'), value: ROOM_ACTION.whitelistRemove },
+            { label: t('roomDetail.blacklistBan'), value: ROOM_ACTION.blacklistBan },
+            { label: t('roomDetail.blacklistUnban'), value: ROOM_ACTION.blacklistUnban },
           ]"
         />
-        <UInput v-model="listUserId" type="number" label="用户 Phira ID" placeholder="目标用户 id" />
+        <PPInput v-model="listUserId" type="number" :label="t('roomDetail.targetUser')" :placeholder="t('roomDetail.targetUserPlaceholder')" />
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="listOpen = false">
-            取消
-          </UButton>
-          <UButton variant="primary" :disabled="!listUserId" @click="doListAction">
-            执行
-          </UButton>
+          <PPButton weight="quiet" @click="listOpen = false">
+            {{ t('common.cancel') }}
+          </PPButton>
+          <PPButton weight="primary" :disabled="!listUserId" @click="doListAction">
+            {{ t('roomDetail.execute') }}
+          </PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
   </div>
 </template>

@@ -2,39 +2,38 @@ import { describe, expect, it } from 'vitest'
 import { API_ERROR_CODES } from '~/types/api'
 import { ApiError, normalizeFetchError } from '~/utils/api-error'
 
-describe('normalizeFetchError (frozen PPB error contract, P4 UPPER_SNAKE)', () => {
-  it('maps the frozen error envelope to ApiError', () => {
+describe('normalizeFetchError (REST Error Contract v1.1)', () => {
+  it('maps a valid frozen error envelope to ApiError', () => {
     const err = {
       statusCode: 401,
       data: {
         error: {
-          code: 'AUTH',
-          message: '需要登录',
+          code: 'AUTH_REQUIRED',
+          message: 'authentication required',
           request_id: 'req-1',
-          details: {},
+          details: { params: {} },
         },
       },
     }
     const apiErr = normalizeFetchError(err)
     expect(apiErr).toBeInstanceOf(ApiError)
-    expect(apiErr.code).toBe('AUTH')
-    expect(apiErr.message).toBe('需要登录')
+    expect(apiErr.code).toBe('AUTH_REQUIRED')
     expect(apiErr.requestId).toBe('req-1')
     expect(apiErr.status).toBe(401)
   })
 
-  it('preserves any unknown server error code as string', () => {
+  it('preserves any future server code when the envelope is valid', () => {
     const apiErr = normalizeFetchError({
       statusCode: 422,
-      data: { error: { code: 'FUTURE_SERVER_CODE', message: 'x' } },
+      data: { error: { code: 'FUTURE_SERVER_CODE', message: 'debug fallback', request_id: 'req-2', details: { params: {} } } },
     })
     expect(apiErr.code).toBe('FUTURE_SERVER_CODE')
   })
 
-  it('maps an empty error body to a client-local code (P5)', () => {
+  it('maps an HTTP response outside ErrorEnvelope to INVALID_RESPONSE', () => {
     const apiErr = normalizeFetchError({ statusCode: 429, data: undefined })
     expect(apiErr.status).toBe(429)
-    expect(['NETWORK_ERROR', 'UNKNOWN_ERROR']).toContain(apiErr.code)
+    expect(apiErr.code).toBe('INVALID_RESPONSE')
   })
 
   it('maps a network failure to NETWORK_ERROR', () => {
@@ -42,15 +41,15 @@ describe('normalizeFetchError (frozen PPB error contract, P4 UPPER_SNAKE)', () =
     expect(apiErr.code).toBe('NETWORK_ERROR')
   })
 
-  it('maps a 5xx with empty body to UNKNOWN_ERROR', () => {
+  it('maps a malformed 5xx body to INVALID_RESPONSE rather than guessing from status', () => {
     const apiErr = normalizeFetchError({ statusCode: 503, data: null })
-    expect(apiErr.code).toBe('UNKNOWN_ERROR')
+    expect(apiErr.code).toBe('INVALID_RESPONSE')
     expect(apiErr.status).toBe(503)
   })
 
-  it('exposes the frozen code list', () => {
+  it('exposes generated server codes rather than legacy lowercase/generic codes', () => {
     expect(API_ERROR_CODES).toContain('PHIRA_REAUTH_REQUIRED')
     expect(API_ERROR_CODES).toContain('CAPABILITY_NOT_SUPPORTED')
-    expect(API_ERROR_CODES).not.toContain('auth')
+    expect(API_ERROR_CODES).not.toContain('AUTH')
   })
 })

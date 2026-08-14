@@ -6,18 +6,19 @@ import { useRoute } from 'vue-router'
 import { fetchLogs, translateLog } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
-import UBadge from '~/components/ui/UBadge.vue'
-import UInput from '~/components/ui/UInput.vue'
-import USelect from '~/components/ui/USelect.vue'
+import PPBadge from '~/components/ui/PPBadge.vue'
+import PPInput from '~/components/ui/PPInput.vue'
+import PPSelect from '~/components/ui/PPSelect.vue'
 import { useAsync } from '~/composables/useAsync'
 import { formatDateTime } from '~/utils/format'
 import { localTranslate } from '~/utils/log-translator'
 
 definePageMeta({ permissions: ['logs:view'] })
 
+const { t } = usePanelI18n()
+
 const route = useRoute()
 
-const service = ref('')
 const level = ref('')
 const search = ref('')
 const live = ref(false)
@@ -31,13 +32,12 @@ let es: EventSource | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const list = useAsync(() => fetchLogs({
-  service: service.value || undefined,
   level: level.value || undefined,
   search: search.value || undefined,
   pageNum: 100,
 }))
 
-watch([service, level, search], () => {
+watch([level, search], () => {
   void list.run()
 })
 
@@ -129,11 +129,11 @@ async function locateLog(logId: string) {
       flash(item.log_id)
     }
     else {
-      focusNote.value = `未找到日志 ${logId}`
+      focusNote.value = t('logs.notFound', { id: logId })
     }
   }
   catch {
-    focusNote.value = `无法定位日志 ${logId}（PPB 未就绪）`
+    focusNote.value = t('logs.locateFailed', { id: logId })
   }
 }
 
@@ -174,30 +174,24 @@ const levelTone = (l: string) => (l === 'error' ? 'danger' : l === 'warn' ? 'war
 
 <template>
   <div class="space-y-4">
-    <PageHeader title="日志" subtitle="live + history · 稳定 log_id · 告警聚焦高亮 ~3s · 规则化翻译（§18.11/§19.2）">
+    <PageHeader :title="t('logs.title')" :subtitle="t('logs.subtitle')">
       <template #actions>
-        <UButton size="sm" variant="outline" @click="toggleLive">
-          {{ live ? '停止 Live' : 'Live' }}
-        </UButton>
-        <UButton size="sm" variant="outline" @click="list.run()">
-          刷新
-        </UButton>
+        <PPButton size="sm" weight="secondary" @click="toggleLive">
+          {{ live ? t('logs.stopLive') : t('logs.live') }}
+        </PPButton>
+        <PPButton size="sm" weight="secondary" @click="list.run()">
+          {{ t('logs.refresh') }}
+        </PPButton>
       </template>
     </PageHeader>
 
     <div class="flex flex-wrap items-center gap-2">
-      <USelect
-        v-model="service"
-        placeholder="服务"
-        :options="[
-          { label: 'PPB', value: 'ppb' },
-          { label: 'PMP', value: 'pmp' },
-          { label: 'Panel', value: 'panel' },
-        ]"
-      />
-      <USelect
+      <PPBadge tone="neutral">
+        PMP
+      </PPBadge>
+      <PPSelect
         v-model="level"
-        placeholder="级别"
+        :placeholder="t('logs.level')"
         :options="[
           { label: 'ERROR', value: 'error' },
           { label: 'WARN', value: 'warn' },
@@ -205,7 +199,7 @@ const levelTone = (l: string) => (l === 'error' ? 'danger' : l === 'warn' ? 'war
           { label: 'DEBUG', value: 'debug' },
         ]"
       />
-      <UInput v-model="search" placeholder="搜索内容 / error_code" class="w-72" />
+      <PPInput v-model="search" :placeholder="t('logs.search')" class="w-72" />
     </div>
 
     <p v-if="focusNote" class="text-sm text-warning">
@@ -220,16 +214,16 @@ const levelTone = (l: string) => (l === 'error' ? 'danger' : l === 'warn' ? 'war
               <thead class="sticky top-0 bg-surface">
                 <tr class="border-b border-border uppercase text-muted">
                   <th class="px-2 py-1.5">
-                    时间
+                    {{ t('logs.time') }}
                   </th>
                   <th class="px-2 py-1.5">
-                    级别
+                    {{ t('logs.level') }}
                   </th>
                   <th class="px-2 py-1.5">
-                    服务
+                    {{ t('logs.service') }}
                   </th>
                   <th class="px-2 py-1.5">
-                    消息
+                    {{ t('logs.message') }}
                   </th>
                 </tr>
               </thead>
@@ -245,9 +239,9 @@ const levelTone = (l: string) => (l === 'error' ? 'danger' : l === 'warn' ? 'war
                     {{ formatDateTime(e.timestamp) }}
                   </td>
                   <td class="px-2 py-1">
-                    <UBadge :tone="levelTone(e.level)">
+                    <PPBadge :tone="levelTone(e.level)">
                       {{ e.level }}
-                    </UBadge>
+                    </PPBadge>
                   </td>
                   <td class="px-2 py-1 text-muted">
                     {{ e.service }}
@@ -264,7 +258,7 @@ const levelTone = (l: string) => (l === 'error' ? 'danger' : l === 'warn' ? 'war
 
       <aside class="rounded-lg border border-border bg-surface p-4">
         <h3 class="mb-2 text-sm font-medium text-foreground">
-          日志详情 / 翻译
+          {{ t('logs.detail') }}
         </h3>
         <template v-if="selected">
           <p class="font-mono text-[11px] text-muted">
@@ -276,39 +270,39 @@ const levelTone = (l: string) => (l === 'error' ? 'danger' : l === 'warn' ? 'war
           <dl v-if="translation" class="mt-3 space-y-2 text-sm">
             <div>
               <dt class="text-xs text-muted">
-                标题
+                {{ t('logs.translationTitle') }}
               </dt><dd class="font-medium text-foreground">
                 {{ translation.title }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-muted">
-                说明
+                {{ t('logs.explanation') }}
               </dt><dd class="text-foreground">
                 {{ translation.explanation }}
               </dd>
             </div>
             <div v-if="translation.module">
               <dt class="text-xs text-muted">
-                模块
+                {{ t('logs.module') }}
               </dt><dd class="text-foreground">
                 {{ translation.module }}
               </dd>
             </div>
             <div v-if="translation.suggestion">
               <dt class="text-xs text-muted">
-                建议
+                {{ t('logs.suggestion') }}
               </dt><dd class="text-foreground">
                 {{ translation.suggestion }}
               </dd>
             </div>
           </dl>
           <p v-else class="mt-2 text-xs text-muted">
-            暂无翻译规则匹配（raw 日志保持可见）。
+            {{ t('logs.noTranslation') }}
           </p>
         </template>
         <p v-else class="text-sm text-muted">
-          点击一条日志查看详情。
+          {{ t('logs.selectHint') }}
         </p>
       </aside>
     </div>

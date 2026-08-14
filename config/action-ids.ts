@@ -43,6 +43,8 @@ export type RoomActionId = (typeof ROOM_ACTION)[keyof typeof ROOM_ACTION]
 export const SERVER_ACTION = {
   configReload: 'server.config_reload',
   shutdown: 'server.shutdown',
+  start: 'server.start',
+  supervisorStop: 'server.supervisor_stop',
   setConnections: 'server.connections',
   setRoomCreation: 'server.roomcreation',
 } as const

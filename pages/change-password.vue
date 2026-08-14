@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import UButton from '~/components/ui/UButton.vue'
-import UInput from '~/components/ui/UInput.vue'
+import PPButton from '~/components/ui/PPButton.vue'
+import PPInput from '~/components/ui/PPInput.vue'
 import { useAuthStore } from '~/stores/auth'
-import { ApiError } from '~/utils/api-error'
+import { localizePanelError } from '~/utils/api-error'
+
+const { t } = usePanelI18n()
 
 definePageMeta({
   layout: 'auth',
@@ -22,11 +24,11 @@ const busy = ref(false)
 async function submit() {
   errorMessage.value = ''
   if (newPassword.value !== confirmPassword.value) {
-    errorMessage.value = '两次输入的新密码不一致'
+    errorMessage.value = t('changePasswordPage.mismatch')
     return
   }
   if (newPassword.value.length < 10) {
-    errorMessage.value = '新密码至少 10 位'
+    errorMessage.value = t('changePasswordPage.tooShort')
     return
   }
   busy.value = true
@@ -35,7 +37,7 @@ async function submit() {
     await router.replace('/')
   }
   catch (err) {
-    errorMessage.value = err instanceof ApiError ? err.message : '修改失败，请重试'
+    errorMessage.value = localizePanelError(t, err).message
   }
   finally {
     busy.value = false
@@ -47,33 +49,33 @@ async function submit() {
   <form class="space-y-4" @submit.prevent="submit">
     <div>
       <h2 class="text-lg font-semibold text-foreground">
-        修改 Root 密码
+        {{ t('changePasswordPage.title') }}
       </h2>
       <p class="mt-1 text-sm text-muted">
-        首次登录必须修改默认随机密码。
+        {{ t('changePasswordPage.subtitle') }}
       </p>
     </div>
 
-    <UInput
+    <PPInput
       v-model="currentPassword"
       type="password"
-      label="当前密码"
+      :label="t('changePasswordPage.current')"
       name="current_password"
       autocomplete="current-password"
       required
     />
-    <UInput
+    <PPInput
       v-model="newPassword"
       type="password"
-      label="新密码"
+      :label="t('changePasswordPage.new')"
       name="new_password"
       autocomplete="new-password"
       required
     />
-    <UInput
+    <PPInput
       v-model="confirmPassword"
       type="password"
-      label="确认新密码"
+      :label="t('changePasswordPage.confirm')"
       name="confirm_password"
       autocomplete="new-password"
       required
@@ -83,13 +85,13 @@ async function submit() {
       {{ errorMessage }}
     </p>
 
-    <UButton
+    <PPButton
       type="submit"
-      variant="primary"
+      weight="primary"
       :disabled="busy || !currentPassword || !newPassword || !confirmPassword"
       full-width
     >
-      {{ busy ? '提交中…' : '修改密码' }}
-    </UButton>
+      {{ busy ? t('changePasswordPage.submitting') : t('changePasswordPage.submit') }}
+    </PPButton>
   </form>
 </template>

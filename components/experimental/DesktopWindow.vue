@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { onBeforeUnmount, reactive } from 'vue'
+import PPIcon from '~/components/ui/PPIcon.vue'
 import { loadWindowGeometry, saveWindowGeometry } from '~/utils/window-geometry'
 
 /**
  * Experimental Desktop Window (§22.5) — preference-gated, default off.
- * drag / resize / multi-window skeleton + device-local geometry persistence.
+ * drag / resize / multi-window interaction shell + device-local geometry persistence.
  * Deliberately NOT a taskbar/dock/macOS-traffic-lights clone.
  */
 const props = defineProps<{
   id: string
   title: string
-  zIndex: number
+  layerIndex: number
 }>()
 
 const emit = defineEmits<{ close: [], focus: [] }>()
@@ -63,28 +64,31 @@ function startResize(e: PointerEvent) {
 }
 
 onBeforeUnmount(() => save())
+
+const { t } = usePanelI18n()
 </script>
 
 <template>
   <section
-    class="fixed flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-overlay"
-    :style="{ left: `${g.x}px`, top: `${g.y}px`, width: `${g.width}px`, height: `${g.height}px`, zIndex }"
+    class="fixed z-[calc(var(--pp-z-desktop-window-base)+var(--pp-desktop-window-index))] flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-overlay"
+    :style="{ left: `${g.x}px`, top: `${g.y}px`, width: `${g.width}px`, height: `${g.height}px`, '--pp-desktop-window-index': layerIndex }"
     role="dialog"
     :aria-label="title"
     @pointerdown="emit('focus')"
   >
     <header
-      class="flex h-8 shrink-0 cursor-move select-none items-center justify-between border-b border-border px-2"
+      class="pp-desktop-window-header flex min-h-8 shrink-0 cursor-move select-none items-center justify-between border-b border-border px-2"
       @pointerdown="startDrag"
     >
       <span class="truncate text-xs font-medium text-foreground">{{ title }}</span>
       <button
         type="button"
-        class="text-muted transition-colors hover:text-foreground"
-        aria-label="关闭窗口"
+        data-pp-touch-critical="desktop-window-close"
+        class="pp-touch-target inline-flex h-8 w-8 items-center justify-center rounded-[var(--pp-radius-control)] text-muted transition-colors hover:bg-surface-secondary hover:text-foreground"
+        :aria-label="t('common.close')"
         @click="emit('close')"
       >
-        ✕
+        <PPIcon name="close" :size="16" />
       </button>
     </header>
     <div class="flex-1 overflow-auto p-2 text-sm text-foreground">

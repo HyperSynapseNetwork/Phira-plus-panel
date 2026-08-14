@@ -30,12 +30,14 @@ function toggle(id: string) {
     set.add(id)
   emit('update:modelValue', [...set])
 }
+
+const { t } = usePanelI18n()
 </script>
 
 <template>
   <div class="space-y-4">
     <p v-if="store.error" class="text-sm text-danger">
-      权限 Manifest 不可用（PPB 未就绪），无法渲染权限树。
+      {{ t('permissionTree.unavailable') }}
     </p>
     <div v-for="group in store.groups" :key="group" class="rounded border border-border p-3">
       <p class="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
@@ -60,7 +62,7 @@ function toggle(id: string) {
       </div>
     </div>
     <p v-if="!store.groups.length && !store.error" class="text-sm text-muted">
-      暂无权限数据（Manifest 未加载或为空）。
+      {{ t('permissionTree.empty') }}
     </p>
   </div>
 </template>

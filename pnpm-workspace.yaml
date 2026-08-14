@@ -2,7 +2,7 @@
 # - shellEmulator: use pnpm's shell emulator for lifecycle scripts
 # - allowBuilds: run esbuild's postinstall so its platform binary is validated
 # NOTE: `trustPolicy: no-downgrade` (enforced by @antfu/eslint-config's
-# pnpm/yaml-enforce-settings rule) is intentionally disabled for Phase A — it
+# pnpm/yaml-enforce-settings rule) is intentionally disabled for this repository — it
 # breaks `pnpm install`/script execution against the npmmirror registry for two
 # transitive packages (semver@6.3.1, undici-types@6.21.0). Re-enable once the
 # lockfile is reconciled with a trusted registry (see docs/PHASE_A_PLAN.md).

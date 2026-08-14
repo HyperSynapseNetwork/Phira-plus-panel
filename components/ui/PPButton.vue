@@ -15,12 +15,14 @@ const props = withDefaults(defineProps<{
   type?: 'button' | 'submit' | 'reset'
   disabled?: boolean
   loading?: boolean
+  fullWidth?: boolean
 }>(), {
-  weight: 'primary',
+  weight: 'secondary',
   size: 'md',
   type: 'button',
   disabled: false,
   loading: false,
+  fullWidth: false,
 })
 
 const sizes: Record<Size, string> = {
@@ -36,7 +38,7 @@ const weights: Record<Weight, string> = {
 }
 
 const classes = computed(() => [
-  'inline-flex items-center justify-center gap-2 font-medium',
+  'pp-touch-target inline-flex items-center justify-center gap-2 font-medium',
   'rounded-[var(--pp-radius-control)]',
   'transition-[background-color,transform] duration-150',
   'active:scale-[0.98]',
@@ -44,6 +46,7 @@ const classes = computed(() => [
   'disabled:pointer-events-none disabled:opacity-50',
   sizes[props.size],
   weights[props.weight],
+  props.fullWidth ? 'w-full' : '',
 ].join(' '))
 </script>
 

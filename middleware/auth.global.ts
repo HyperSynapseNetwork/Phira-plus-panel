@@ -5,8 +5,8 @@ import { useAuthStore } from '~/stores/auth'
  * Global auth guard.
  * - Public routes opt out via `definePageMeta({ requiresAuth: false })`.
  * - First-login principals are forced through /change-password.
- * - Route-level `permissions: []` meta is enforced here (Phase A stub; later
- *   wired to the PPB Permission Manifest).
+ * - Route-level `permissions: []` meta is enforced against the permissions
+ *   returned by PPB's authenticated session probe.
  */
 export default defineNuxtRouteMiddleware(async (to) => {
   const auth = useAuthStore()

@@ -1,0 +1,6 @@
+panel-phira.htadiy.com {
+    root * /srv/panel
+    header X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, noimageindex"
+    try_files {path} {path}/ /index.html
+    file_server
+}

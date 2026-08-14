@@ -53,8 +53,9 @@ export function apiFetch<T>(path: string, opts: JsonFetchOptions = {}): Promise<
     const headers: Record<string, string> = token ? { 'X-CSRF-Token': token } : {}
     return doFetch(headers).catch(async (err: unknown) => {
       const normalized = normalizeFetchError(err)
-      // CSRF rejection (403) — refresh the token once and retry.
-      if (normalized.status === 403) {
+      // Retry only the explicit CSRF contract error. A generic 403 permission
+      // denial must not trigger a token refresh/replay.
+      if (normalized.code === 'CSRF_INVALID') {
         const fresh = await refreshCsrfToken(baseURL)
         if (fresh)
           return doFetch({ 'X-CSRF-Token': fresh })
@@ -95,7 +96,7 @@ export function useApi(): ApiClient {
 /**
  * Reactive variant for data pages that want caching/refetch semantics.
  * Uses the same credentialed base + error normalization. Reserved for
- * Phase C data pages; Phase A infrastructure is `useApi().fetch`.
+ * Data-page helper built on the same frozen API client used by imperative mutations.
  */
 export function useApiFetch<T>(
   path: MaybeRefOrGetter<string>,

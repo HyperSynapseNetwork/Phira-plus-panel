@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import UButton from '~/components/ui/UButton.vue'
-import UInput from '~/components/ui/UInput.vue'
-import UModal from '~/components/ui/UModal.vue'
+import PPButton from '~/components/ui/PPButton.vue'
+import PPInput from '~/components/ui/PPInput.vue'
+import PPModal from '~/components/ui/PPModal.vue'
 
 const props = defineProps<{
   open: boolean
@@ -15,18 +15,20 @@ const emit = defineEmits<{
   'confirm': []
   'cancel': []
 }>()
+
+const { t } = usePanelI18n()
 </script>
 
 <template>
-  <UModal :open="open" title="敏感操作重认证" width="max-w-md" @close="emit('cancel')">
+  <PPModal :open="open" layer="reauth" :title="t('reauth.title')" width="max-w-md" @close="emit('cancel')">
     <div class="space-y-3">
       <p class="text-sm text-muted">
-        此操作要求重新认证（§23 #10）。输入密码获取短期 reauth context（X-Reauth-Token，TTL 5 分钟）。
+        {{ t('reauth.hint') }}
       </p>
-      <UInput
+      <PPInput
         :model-value="password"
         type="password"
-        label="密码"
+        :label="t('reauth.password')"
         autocomplete="current-password"
         @update:model-value="v => emit('update:password', v)"
         @keyup.enter="emit('confirm')"
@@ -37,13 +39,13 @@ const emit = defineEmits<{
     </div>
     <template #footer>
       <div class="flex justify-end gap-2">
-        <UButton variant="ghost" @click="emit('cancel')">
-          取消
-        </UButton>
-        <UButton variant="danger" :disabled="busy || !props.password" @click="emit('confirm')">
-          确认执行
-        </UButton>
+        <PPButton weight="quiet" @click="emit('cancel')">
+          {{ t('common.cancel') }}
+        </PPButton>
+        <PPButton weight="dangerous" :disabled="busy || !props.password" @click="emit('confirm')">
+          {{ t('reauth.confirm') }}
+        </PPButton>
       </div>
     </template>
-  </UModal>
+  </PPModal>
 </template>

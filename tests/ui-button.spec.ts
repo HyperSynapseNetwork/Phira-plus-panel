@@ -1,22 +1,21 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import UButton from '~/components/ui/UButton.vue'
+import PPButton from '~/components/ui/PPButton.vue'
 
-describe('uButton (local HeroUI wrapper)', () => {
-  it('renders slot content with HeroUI variant classes', () => {
-    const wrapper = mount(UButton, {
-      props: { variant: 'primary', size: 'md' },
-      slots: { default: '登录' },
+describe('PPButton public primitive', () => {
+  it('renders contract weight and size', () => {
+    const wrapper = mount(PPButton, {
+      props: { weight: 'dangerous', size: 'md' },
+      slots: { default: '删除' },
     })
-    expect(wrapper.text()).toBe('登录')
+    expect(wrapper.text()).toBe('删除')
     const classes = wrapper.attributes('class') ?? ''
-    expect(classes).toContain('button')
-    expect(classes).toContain('button--primary')
-    expect(classes).toContain('button--md')
+    expect(classes).toContain('bg-danger')
+    expect(classes).toContain('h-9')
   })
 
   it('forwards type and disabled state', () => {
-    const wrapper = mount(UButton, {
+    const wrapper = mount(PPButton, {
       props: { type: 'submit', disabled: true },
       slots: { default: 'go' },
     })
@@ -26,7 +25,7 @@ describe('uButton (local HeroUI wrapper)', () => {
   })
 
   it('emits click', async () => {
-    const wrapper = mount(UButton, { slots: { default: 'go' } })
+    const wrapper = mount(PPButton, { slots: { default: 'go' } })
     await wrapper.trigger('click')
     expect(wrapper.emitted('click')).toBeTruthy()
   })

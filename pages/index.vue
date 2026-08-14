@@ -7,6 +7,7 @@ import { formatNumber, timeAgo } from '~/utils/format'
 
 definePageMeta({ permissions: ['dashboard:view'] })
 
+const { t } = usePanelI18n()
 const server = useAsync(() => fetchServerStatus())
 const stats = useAsync(() => fetchServerStats())
 const logs = useAsync(() => fetchLogs({ level: 'warn,error', pageNum: 100 }))
@@ -67,23 +68,23 @@ const activeJobs = computed(() => (jobs.data.value?.items ?? []).filter(j => j.s
 <template>
   <div class="space-y-4">
     <h1 class="text-lg font-semibold text-foreground">
-      仪表盘
+      {{ t('dashboard.title') }}
     </h1>
 
     <!-- 服务器状态条（单行，非 KPI 方块） -->
     <section class="flex items-center gap-3 rounded-[var(--pp-radius-surface)] border border-border bg-surface px-4 py-3">
       <PPStatus :tone="healthTone">
-        {{ healthTone === 'live' ? '运行中' : healthTone === 'error' ? '异常' : '未知' }}
+        {{ healthTone === 'live' ? t('dashboard.running') : healthTone === 'error' ? t('dashboard.error') : t('dashboard.unknown') }}
       </PPStatus>
       <div class="text-sm">
         <span class="text-foreground">{{ formatNumber(stats.data.value?.users_online) }}</span>
-        <span class="text-muted"> 在线</span>
+        <span class="text-muted"> {{ t('dashboard.online') }}</span>
         <span class="text-muted"> · </span>
         <span class="text-foreground">{{ formatNumber(stats.data.value?.active_rooms) }}</span>
-        <span class="text-muted"> 房间</span>
+        <span class="text-muted"> {{ t('dashboard.rooms') }}</span>
       </div>
       <span class="ml-auto text-xs text-muted">
-        PMP {{ status?.pmp?.connected ? '已连接' : '未连接' }}
+        PMP {{ status?.pmp?.connected ? t('dashboard.pmpConnected') : t('dashboard.pmpDisconnected') }}
       </span>
     </section>
 
@@ -91,17 +92,17 @@ const activeJobs = computed(() => (jobs.data.value?.items ?? []).filter(j => j.s
     <section>
       <div class="mb-1 flex items-center justify-between">
         <h2 class="text-xs font-medium uppercase tracking-wide text-muted">
-          运行告警
+          {{ t('dashboard.alerts') }}
         </h2>
         <NuxtLink to="/logs" class="text-xs text-muted hover:text-foreground">
-          全部日志
+          {{ t('dashboard.allLogs') }}
         </NuxtLink>
       </div>
       <AsyncState
         :loading="logs.loading.value"
         :error="logs.error.value"
         :empty="alerts.length === 0"
-        empty-text="暂无告警"
+:empty-text="t('dashboard.noAlerts')"
       >
         <ul class="space-y-1">
           <li
@@ -121,24 +122,13 @@ const activeJobs = computed(() => (jobs.data.value?.items ?? []).filter(j => j.s
 
     <!-- 指标（一行，非 8 张 KPI 卡） -->
     <div class="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
-      <span><span class="text-foreground">{{ formatNumber(stats.data.value?.users_online) }}</span> <span class="text-muted">在线</span></span>
-      <span><span class="text-foreground">{{ formatNumber(stats.data.value?.active_rooms) }}</span> <span class="text-muted">房间</span></span>
-      <span><span class="text-foreground">{{ formatNumber(stats.data.value?.active_sessions) }}</span> <span class="text-muted">会话</span></span>
-      <span><span class="text-foreground">{{ formatNumber(activeJobs) }}</span> <span class="text-muted">任务</span></span>
-      <span><span class="text-foreground">{{ formatNumber(stats.data.value?.loaded_plugins) }}</span> <span class="text-muted">插件</span></span>
-      <span v-if="errorCount > 0"><span class="text-danger">{{ errorCount }}</span> <span class="text-muted">错误</span></span>
+      <span><span class="text-foreground">{{ formatNumber(stats.data.value?.users_online) }}</span> <span class="text-muted">{{ t('dashboard.online') }}</span></span>
+      <span><span class="text-foreground">{{ formatNumber(stats.data.value?.active_rooms) }}</span> <span class="text-muted">{{ t('dashboard.rooms') }}</span></span>
+      <span><span class="text-foreground">{{ formatNumber(stats.data.value?.active_sessions) }}</span> <span class="text-muted">{{ t('dashboard.sessions') }}</span></span>
+      <span><span class="text-foreground">{{ formatNumber(activeJobs) }}</span> <span class="text-muted">{{ t('dashboard.jobs') }}</span></span>
+      <span><span class="text-foreground">{{ formatNumber(stats.data.value?.loaded_plugins) }}</span> <span class="text-muted">{{ t('dashboard.plugins') }}</span></span>
+      <span v-if="errorCount > 0"><span class="text-danger">{{ errorCount }}</span> <span class="text-muted">{{ t('dashboard.errors') }}</span></span>
     </div>
 
-    <!-- 在线趋势（暂无 metrics history 数据源，诚实空置） -->
-    <section class="rounded-[var(--pp-radius-surface)] border border-border bg-surface p-4">
-      <h2 class="mb-2 text-sm font-medium text-foreground">在线趋势</h2>
-      <p class="text-sm text-muted">暂无数据</p>
-    </section>
-
-    <!-- 最近房间（无房间列表数据源，诚实空置） -->
-    <section class="rounded-[var(--pp-radius-surface)] border border-border bg-surface p-4">
-      <h2 class="mb-2 text-sm font-medium text-foreground">最近房间</h2>
-      <p class="text-sm text-muted">暂无房间</p>
-    </section>
   </div>
 </template>

@@ -2,10 +2,12 @@
 import { useRuntimeConfig } from 'nuxt/app'
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import UButton from '~/components/ui/UButton.vue'
-import UInput from '~/components/ui/UInput.vue'
+import PPButton from '~/components/ui/PPButton.vue'
+import PPInput from '~/components/ui/PPInput.vue'
 import { useAuthStore } from '~/stores/auth'
-import { ApiError } from '~/utils/api-error'
+import { localizePanelError } from '~/utils/api-error'
+const { t, locale } = usePanelI18n()
+
 
 definePageMeta({
   requiresAuth: false,
@@ -22,26 +24,7 @@ const errorMessage = ref('')
 const busy = ref(false)
 
 function errorText(err: unknown): string {
-  if (err instanceof ApiError) {
-    switch (err.code) {
-      case 'AUTH':
-      case 'SESSION':
-        return '凭据无效或会话已过期'
-      case 'RATE_LIMIT':
-        return '请求过于频繁，请稍后再试'
-      case 'VALIDATION':
-        return '输入不合法'
-      case 'PERMISSION_DENIED':
-        return '该账户无管理权限'
-      case 'PMP_UNAVAILABLE':
-        return 'PMP 不可用，请稍后再试'
-      case 'NETWORK_ERROR':
-        return '无法连接 API，请检查网络'
-      default:
-        return err.message || '登录失败'
-    }
-  }
-  return '登录失败，请重试'
+  return localizePanelError(t, err).message
 }
 
 /**
@@ -53,7 +36,12 @@ function errorText(err: unknown): string {
  */
 function phiraLoginUrl(): string {
   const base = config.public.apiBase
-  return `${base}/auth/phira/login?client_type=panel&return_to=${encodeURIComponent('/')}`
+  return `${base}/auth/phira/login?client_type=panel&lang=${encodeURIComponent(locale.value)}&return_to=${encodeURIComponent('/')}`
+}
+
+function githubLoginUrl(): string {
+  const base = config.public.apiBase
+  return `${base}/auth/phira/login?client_type=panel&intent=github&lang=${encodeURIComponent(locale.value)}&return_to=${encodeURIComponent('/')}`
 }
 
 async function submit() {
@@ -82,30 +70,40 @@ async function submit() {
   <form class="space-y-4" @submit.prevent="submit">
     <div>
       <h2 class="text-lg font-semibold text-foreground">
-        管理员登录
+        {{ t('auth.adminLogin') }}
       </h2>
       <p class="mt-1 text-sm text-muted">
-        普通管理员使用 Phira 账号（组成员）登录；Root 为应急本地主体。
+        {{ t('auth.adminLoginHint') }}
       </p>
     </div>
 
     <a
       :href="phiraLoginUrl()"
-      class="flex w-full items-center justify-center rounded bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent/90"
+      data-pp-touch-critical="auth-phira"
+      class="pp-touch-target flex w-full items-center justify-center rounded bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent/90"
     >
-      使用 Phira 账号登录
+      {{ t('auth.phiraLogin') }}
     </a>
+
+    <a
+      :href="githubLoginUrl()"
+      data-pp-touch-critical="auth-github"
+      class="pp-touch-target flex w-full items-center justify-center rounded border border-border bg-surface-secondary px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-tertiary"
+    >
+      {{ t('auth.githubLogin') }}
+    </a>
+    <p class="text-xs text-muted">{{ t('auth.gatewayHint') }}</p>
 
     <div class="flex items-center gap-2 text-xs text-muted">
       <span class="h-px flex-1 bg-border" />
-      Root 密码登录
+      {{ t('auth.rootLogin') }}
       <span class="h-px flex-1 bg-border" />
     </div>
 
-    <UInput
+    <PPInput
       v-model="password"
       type="password"
-      label="Root 密码"
+      :label="t('auth.rootPassword')"
       name="password"
       autocomplete="current-password"
       required
@@ -116,14 +114,14 @@ async function submit() {
       {{ errorMessage }}
     </p>
 
-    <UButton
+    <PPButton
       type="submit"
-      variant="primary"
+      weight="primary"
       :disabled="busy || !password"
       full-width
       data-testid="root-login-submit"
     >
-      {{ busy ? '登录中…' : '登录' }}
-    </UButton>
+      {{ busy ? t('auth.signingIn') : t('auth.login') }}
+    </PPButton>
   </form>
 </template>

@@ -1,0 +1,5 @@
+{
+  "minimumRuntimeCalls": 50,
+  "minimumFeatureCalls": 40,
+  "notes": "Collapse guard only. Update downward only with an explicit contract-review reason; never to make a broken scanner pass."
+}

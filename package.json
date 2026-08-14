@@ -15,7 +15,11 @@
     "vue-tsc": "nuxt prepare && vue-tsc --noEmit",
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
-    "test:noindex": "vitest run tests/noindex.spec.ts"
+    "test:noindex": "vitest run tests/noindex.spec.ts",
+    "test:error-i18n": "ERROR_LOCALE_DIR=i18n ERROR_SOURCE_DIR=. node scripts/check-error-i18n.mjs",
+    "test:design-contract": "node scripts/check-design-contract.mjs",
+    "test:product-copy": "node scripts/check-product-copy.mjs",
+    "test:runtime-semantics": "node scripts/check-template-shadow.mjs"
   },
   "dependencies": {
     "@formkit/auto-animate": "0.10.0",

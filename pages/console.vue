@@ -3,20 +3,23 @@ import { ref } from 'vue'
 import { executeCommand, fetchCommandHistory, rootReauth } from '~/api/admin'
 import AsyncState from '~/components/admin/AsyncState.vue'
 import PageHeader from '~/components/admin/PageHeader.vue'
-import UBadge from '~/components/ui/UBadge.vue'
-import UButton from '~/components/ui/UButton.vue'
-import UInput from '~/components/ui/UInput.vue'
-import UModal from '~/components/ui/UModal.vue'
-import UTabs from '~/components/ui/UTabs.vue'
+import PPBadge from '~/components/ui/PPBadge.vue'
+import PPButton from '~/components/ui/PPButton.vue'
+import PPInput from '~/components/ui/PPInput.vue'
+import PPModal from '~/components/ui/PPModal.vue'
+import PPTabs from '~/components/ui/PPTabs.vue'
+import PPSurface from '~/components/ui/PPSurface.vue'
 import { useAsync } from '~/composables/useAsync'
-import { ApiError } from '~/utils/api-error'
+import { commandStatusLabel } from '~/features/console/labels'
 
 definePageMeta({ permissions: ['pmp:cli'] })
+
+const { t } = usePanelI18n()
 
 const command = ref('')
 const output = ref('')
 const busy = ref(false)
-const msg = ref('')
+const notice = useNotice()
 const scope = ref('personal')
 
 // Danger detection (placeholder ruleset) — dangerous commands need confirm + reauth.
@@ -37,14 +40,14 @@ function switchScope(s: string) {
 async function doExecute(reauthToken?: string) {
   output.value = ''
   busy.value = true
-  msg.value = ''
   try {
     const run = await executeCommand(command.value.trim(), reauthToken)
     output.value = run.output ?? run.error ?? `[${run.status}] ${run.command}`
+    notice.success('notice.commandCompleted', { dedupKey: 'console:command' })
     void history.run()
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '执行失败'
+    notice.errorFromApi(err, { dedupKey: 'console:command:error' })
   }
   finally {
     busy.value = false
@@ -69,7 +72,6 @@ function confirmDanger() {
 
 async function confirmReauth() {
   busy.value = true
-  msg.value = ''
   try {
     const { reauth_token } = await rootReauth(reauthPassword.value)
     reauthPassword.value = ''
@@ -77,15 +79,15 @@ async function confirmReauth() {
     await doExecute(reauth_token)
   }
   catch (err) {
-    msg.value = err instanceof ApiError ? err.message : '重认证失败'
+    notice.errorFromApi(err, { dedupKey: 'console:reauth:error' })
   }
   finally {
     busy.value = false
   }
 }
 
-// Autocomplete placeholder — based on PMP CLI surface (design §18.10); PPB
-// will provide authoritative completion from PMP help later.
+// Offline completion fallback based on PMP's documented CLI surface. Command
+// execution remains server-authoritative and fully audited by PPB.
 const SUGGESTIONS = [
   'help',
   'version',
@@ -117,46 +119,43 @@ const SUGGESTIONS = [
 
 <template>
   <div class="space-y-4">
-    <PageHeader title="PMP 控制台" subtitle="raw cli.execute · 危险命令确认 + reauth · personal/server 历史分离 · 全量 Audit（§18.10）" />
+    <PageHeader :title="t('consolePage.title')" :subtitle="t('consolePage.subtitle')" />
 
-    <section class="rounded-lg border border-border bg-surface p-4">
+    <PPSurface padded>
       <div class="flex gap-2">
-        <UInput
+        <PPInput
           v-model="command"
           class="flex-1"
-          placeholder="输入 PMP CLI 命令，如 `rooms list`"
+          :placeholder="t('consolePage.placeholder')"
           list="console-suggestions"
           @keyup.enter="submit"
         />
         <datalist id="console-suggestions">
           <option v-for="s in SUGGESTIONS" :key="s" :value="s" />
         </datalist>
-        <UButton variant="primary" :disabled="busy || !command.trim()" @click="submit">
-          执行
-        </UButton>
+        <PPButton weight="primary" :disabled="busy || !command.trim()" @click="submit">
+          {{ t('consolePage.execute') }}
+        </PPButton>
       </div>
       <p v-if="isDangerous()" class="mt-2 text-xs text-warning">
-        危险命令：需要二次确认 + Root 重认证，执行将全量 Audit。
+        {{ t('consolePage.dangerHint') }}
       </p>
-      <p v-if="msg" class="mt-2 text-sm text-accent" role="status">
-        {{ msg }}
-      </p>
-    </section>
+    </PPSurface>
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <section class="rounded-lg border border-border bg-surface p-4">
+      <PPSurface padded>
         <h3 class="mb-2 text-sm font-medium text-foreground">
-          输出
+          {{ t('consolePage.output') }}
         </h3>
-        <pre class="max-h-96 overflow-auto rounded bg-surface-secondary p-3 font-mono text-xs text-foreground">{{ output || '（等待执行）' }}</pre>
-      </section>
+        <pre class="max-h-96 overflow-auto rounded bg-surface-secondary p-3 font-mono text-xs text-foreground">{{ output || t('consolePage.waiting') }}</pre>
+      </PPSurface>
 
-      <section class="rounded-lg border border-border bg-surface p-4">
+      <PPSurface padded>
         <div class="mb-2 flex items-center justify-between">
           <h3 class="text-sm font-medium text-foreground">
-            历史
+            {{ t('consolePage.history') }}
           </h3>
-          <UTabs
+          <PPTabs
             :model-value="scope"
             :tabs="[
               { key: 'personal', label: 'Personal' },
@@ -169,51 +168,51 @@ const SUGGESTIONS = [
           <ul class="max-h-96 space-y-1 overflow-auto text-xs">
             <li v-for="c in history.data.value?.items ?? []" :key="c.command_id" class="rounded bg-surface-secondary px-2 py-1">
               <span class="font-mono text-foreground">{{ c.command }}</span>
-              <span class="ml-2 text-muted">{{ c.status }}</span>
-              <UBadge v-if="c.scope === 'server'" tone="info">
-                server
-              </UBadge>
+              <span class="ml-2 text-muted">{{ commandStatusLabel(t, c.status) }}</span>
+              <PPBadge v-if="c.scope === 'server'" tone="info">
+                {{ t('consolePage.serverScope') }}
+              </PPBadge>
             </li>
           </ul>
         </AsyncState>
-      </section>
+      </PPSurface>
     </div>
 
     <!-- Danger confirm -->
-    <UModal :open="confirmOpen" title="危险命令确认" width="max-w-md" @close="confirmOpen = false">
+    <PPModal :open="confirmOpen" :title="t('consolePage.dangerTitle')" width="max-w-md" @close="confirmOpen = false">
       <p class="text-sm text-foreground">
-        命令 <code class="rounded bg-surface-secondary px-1 font-mono">{{ command }}</code> 属于危险命令。需要 Root 重认证后执行，并将全量审计。
+        <span>{{ t('consolePage.dangerConfirm') }}</span> <code class="rounded bg-surface-secondary px-1 font-mono">{{ command }}</code>
       </p>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="confirmOpen = false">
-            取消
-          </UButton>
-          <UButton variant="danger" @click="confirmDanger">
-            继续
-          </UButton>
+          <PPButton weight="quiet" @click="confirmOpen = false">
+            {{ t('common.cancel') }}
+          </PPButton>
+          <PPButton weight="dangerous" @click="confirmDanger">
+            {{ t('consolePage.continue') }}
+          </PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
 
     <!-- Reauth -->
-    <UModal :open="reauthOpen" title="Root 重认证" width="max-w-md" @close="reauthOpen = false">
+    <PPModal :open="reauthOpen" :title="t('consolePage.reauthTitle')" width="max-w-md" @close="reauthOpen = false">
       <div class="space-y-3">
         <p class="text-sm text-muted">
-          重新输入 Root 密码以获取短期 reauth context（P11，TTL 5 分钟）。
+          {{ t('consolePage.reauthHint') }}
         </p>
-        <UInput v-model="reauthPassword" type="password" label="Root 密码" autocomplete="current-password" @keyup.enter="confirmReauth" />
+        <PPInput v-model="reauthPassword" type="password" :label="t('consolePage.rootPassword')" autocomplete="current-password" @keyup.enter="confirmReauth" />
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="reauthOpen = false">
-            取消
-          </UButton>
-          <UButton variant="danger" :disabled="busy" @click="confirmReauth">
-            确认执行
-          </UButton>
+          <PPButton weight="quiet" @click="reauthOpen = false">
+            {{ t('common.cancel') }}
+          </PPButton>
+          <PPButton weight="dangerous" :disabled="busy" @click="confirmReauth">
+            {{ t('consolePage.confirmExecute') }}
+          </PPButton>
         </div>
       </template>
-    </UModal>
+    </PPModal>
   </div>
 </template>
