@@ -13,8 +13,8 @@ node_modules/
 .env.local
 .env.*.local
 
-# Logs
-logs/
+# Logs (root-level server log dir only; `features/logs/` is a domain module)
+/logs/
 *.log
 
 # OS / editor

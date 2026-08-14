@@ -486,7 +486,7 @@ const runtimeEntries = computed(() => {
           <PPSelect v-else-if="spec.allowed_values?.length" :model-value="String(startupValues[spec.key] ?? '')" @update:model-value="setStartupValue(spec.key)">
             <option v-for="value in spec.allowed_values" :key="String(value)" :value="String(value)">{{ value }}</option>
           </PPSelect>
-          <PPInput v-else :model-value="String(startupValues[spec.key] ?? '')" @update:model-value="setStartupValue(spec.key)" :type="spec.kind === 'integer' ? 'number' : 'text'" />
+          <PPInput v-else :model-value="String(startupValues[spec.key] ?? '')" :type="spec.kind === 'integer' ? 'number' : 'text'" @update:model-value="setStartupValue(spec.key)" />
         </label>
         <p v-if="startupSpecs.length === 0" class="text-xs text-muted">
           {{ t('server.noStartupArgs') }}
