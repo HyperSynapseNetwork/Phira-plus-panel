@@ -28,7 +28,7 @@ describe('noindex source baseline (§23.2)', () => {
     const nginx = readFileSync(resolve(ROOT, 'deploy/nginx.conf'), 'utf-8')
     expect(nginx).toContain('X-Robots-Tag')
     expect(nginx).toContain(ROBOTS_HEADER)
-    expect(nginx).toContain('try_files $uri $uri/ /index.html')
+    expect(nginx).toContain('try_files $uri $uri/ $uri.html /index.html')
     const caddy = readFileSync(resolve(ROOT, 'deploy/Caddyfile'), 'utf-8')
     expect(caddy).toContain('X-Robots-Tag')
     expect(caddy).toContain('try_files {path} {path}/ /index.html')

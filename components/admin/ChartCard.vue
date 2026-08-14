@@ -74,7 +74,7 @@ const { t } = usePanelI18n()
           compact
           class="w-24"
           :aria-label="t('chartCard.type')"
-          @update:model-value="value => setChartType(value as ChartKind)"
+          @update:model-value="(value: string) => setChartType(value as ChartKind)"
         >
           <option value="line">
             {{ t('chartCard.line') }}

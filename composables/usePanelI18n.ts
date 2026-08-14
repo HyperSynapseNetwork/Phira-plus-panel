@@ -4,7 +4,8 @@ import zh from '~/i18n/zh.json'
 import { useAuthStore } from '~/stores/auth'
 
 export type PanelLocale = 'zh' | 'en'
-type Params = Record<string, string | number>
+/** i18n interpolation accepts the same scalar set as SafeErrorParams. */
+type Params = Record<string, string | number | boolean | null>
 interface CommonPreference { revision?: number, data?: Record<string, unknown> }
 
 const messages = { zh, en } as const

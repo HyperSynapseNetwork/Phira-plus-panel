@@ -54,6 +54,12 @@ const startupValues = reactive<Record<string, string | number | boolean>>({})
 const deployment = computed(() => status.data.value?.deployment)
 const startupSpecs = computed(() => deployment.value?.startup_args ?? [])
 
+function setStartupValue(key: string): (value: string | number | boolean) => void {
+  return (value) => {
+    startupValues[key] = value
+  }
+}
+
 function openStartModal() {
   for (const key of Object.keys(startupValues)) delete startupValues[key]
   for (const spec of startupSpecs.value) {
@@ -476,11 +482,11 @@ const runtimeEntries = computed(() => {
         </p>
         <label v-for="spec in startupSpecs" :key="spec.key" class="block">
           <span class="mb-1 block text-xs font-medium text-foreground">{{ spec.key }}<span v-if="spec.required" class="text-danger"> *</span></span>
-          <PPSwitch v-if="spec.kind === 'boolean'" :model-value="Boolean(startupValues[spec.key])" @update:model-value="v => startupValues[spec.key] = v" />
-          <PPSelect v-else-if="spec.allowed_values?.length" v-model="startupValues[spec.key]">
+          <PPSwitch v-if="spec.kind === 'boolean'" :model-value="Boolean(startupValues[spec.key])" @update:model-value="setStartupValue(spec.key)" />
+          <PPSelect v-else-if="spec.allowed_values?.length" :model-value="String(startupValues[spec.key] ?? '')" @update:model-value="setStartupValue(spec.key)">
             <option v-for="value in spec.allowed_values" :key="String(value)" :value="String(value)">{{ value }}</option>
           </PPSelect>
-          <PPInput v-else v-model="startupValues[spec.key]" :type="spec.kind === 'integer' ? 'number' : 'text'" />
+          <PPInput v-else :model-value="String(startupValues[spec.key] ?? '')" @update:model-value="setStartupValue(spec.key)" :type="spec.kind === 'integer' ? 'number' : 'text'" />
         </label>
         <p v-if="startupSpecs.length === 0" class="text-xs text-muted">
           {{ t('server.noStartupArgs') }}
